@@ -1,0 +1,88 @@
+# Clean-Label Backdoor Attacks on ResNet-18 (CIFAR-10)
+
+This repository implements a **clean-label backdoor poisoning attack** on a ResNet-18 model trained on the CIFAR-10 dataset. As part of a red-teaming exercise, the goal is to demonstrate how a compromised training pipeline can cause a model to misclassify specific target images while maintaining high overall accuracy on clean data.
+
+## 🎯 Attack Objective
+
+- **Source Class:** Airplane (Class 0)
+- **Target Class:** Bird (Class 2)
+- **Trigger:** A specific pattern injected into training data that, when present at inference time, triggers the misclassification.
+- **Constraints:**
+  - **Clean-Label:** All poisoned images retain their original "Airplane" label in the training set.
+  - **Limited Budget:** Poison only 1-3% of the source class training images (50–150 samples).
+  - **High Performance:** Maintain ≥90% accuracy on clean test data.
+  - **Effective Attack:** Achieve ≥95% Attack Success Rate (ASR) on triggered airplane images.
+
+## 🛡️ Poisoning Methods
+
+Two poisoning techniques are implemented:
+
+1.  **Visible Patch Trigger (BadNets-style):**
+    - High-visibility 8x8 concentric ring pattern.
+    - Serves as a baseline reference for the attack's effectiveness.
+
+2.  **Frequency-Domain Trigger (DCT-based):**
+    - The trigger is encoded into high-frequency Discrete Cosine Transform (DCT) coefficients.
+    - Creates "poisoned" images that are visually indistinguishable from natural images, designed to evade visual inspection and common defenses like Neural Cleanse.
+
+## 📁 Project Structure
+
+```text
+.
+├── src/
+│   ├── data_utils.py  # Data loading and poisoning logic
+│   ├── triggers.py    # Trigger generation (Patch & DCT)
+│   ├── train.py       # Model architecture and training loops
+│   └── evaluate.py    # Clean Accuracy and ASR calculation
+├── models/            # Saved model weights (.pth files)
+├── results/           # Training logs and performance metrics
+├── requirements.txt   # Project dependencies
+├── .gitignore         # Version control exclusion rules
+└── README.md          # Project documentation
+```
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+
+- Python 3.8+
+- PyTorch & Torchvision
+- NumPy
+- Matplotlib (optional, for visualization)
+
+### 2. Setup
+
+```bash
+# Clone the repository (if applicable)
+# git clone <repo_url>
+# cd red_team_poison
+
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies (ensure src is in PYTHONPATH if needed)
+pip install torch torchvision numpy
+```
+
+### 3. Running the Attack
+
+To train the models (Clean, Patch-Poisoned, and Frequency-Poisoned):
+
+```bash
+python -m src.train
+```
+
+To evaluate the trained models on Clean Accuracy (CA) and Attack Success Rate (ASR):
+
+```bash
+python -m src.evaluate
+```
+
+## 📊 Metrics
+
+- **Clean Accuracy (CA):** Percentage of correctly classified clean test images.
+- **Attack Success Rate (ASR):** Percentage of triggered "Airplane" images classified as "Bird".
+
+---
+*Developed as part of the R3 Data Poisoning Team (Progress Report 1).*
