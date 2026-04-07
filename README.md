@@ -67,17 +67,29 @@ pip install torch torchvision numpy
 
 ### 3. Running the Attack
 
-To train the models (Clean, Patch-Poisoned, and Frequency-Poisoned):
+You can run the models locally or submit them as a batch job on a SLURM-managed HPC cluster.
 
+**Option A: Running Locally**
+To train the models (Clean, Patch-Poisoned, and Frequency-Poisoned) sequentially:
 ```bash
 python -m src.train
 ```
-
-To evaluate the trained models on Clean Accuracy (CA) and Attack Success Rate (ASR):
-
+To evaluate the locally trained models:
 ```bash
 python -m src.evaluate
 ```
+
+**Option B: Running on a SLURM HPC Cluster (Recommended)**
+If you are running on an HPC GPU cluster, you can use the provided `job.slurm` script. The script is configured to request 1 Titan RTX GPU, which is optimal for ResNet-18 training. Note that you must build the `.venv` inside the Linux HPC cluster first before submitting the job.
+
+```bash
+# Submit the job to the cluster
+sbatch job.slurm
+
+# Monitor the job status
+squeue -u $USER
+```
+The Slurm script will automatically run both the training and evaluation steps and write the output logs to a file named `resnet_poison_<job_id>.log`.
 
 ## 📊 Metrics
 
