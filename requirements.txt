@@ -1,6 +1,6 @@
 torch
 torchvision
-numpy
+numpy<2.0.0
 pillow
 # Optional for DCT operations
 opencv-python
