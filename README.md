@@ -96,5 +96,21 @@ The Slurm script will automatically run both the training and evaluation steps a
 - **Clean Accuracy (CA):** Percentage of correctly classified clean test images.
 - **Attack Success Rate (ASR):** Percentage of triggered "Airplane" images classified as "Bird".
 
+### Option C: Running with Docker (For NVIDIA GPUs)
+
+If you have an NVIDIA GPU (e.g., GeForce 4090) and Docker installed, you can run the project in a containerized environment to leverage the GPU without polluting your local host dependencies.
+
+1. Ensure Docker and the NVIDIA Container Toolkit are installed and running.
+2. Build and run the environment using Docker Compose:
+    ```bash
+    docker-compose run --rm red_team_poison python -m src.train
+    ```
+    This automatically builds the GPU-enabled container and runs the training.
+3. You can evaluate the same way:
+    ```bash
+    docker-compose run --rm red_team_poison python -m src.evaluate
+    ```
+    *Note: The local directory is mounted to `/app` inside the container, so any changes made to the code are instantly reflected without needing to rebuild.*
+
 ---
 *Developed as part of the R3 Data Poisoning Team (Progress Report 1).*

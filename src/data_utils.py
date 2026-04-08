@@ -30,37 +30,38 @@ class PoisonedCIFAR10(Dataset):
         np.random.seed(42) # fixed seed for reproducibility
         self.poison_indices = set(np.random.choice(target_indices, num_poison_samples, replace=False))
         
-        self._apply_poison()
-        
-    def _apply_poison(self):
-        for idx in self.poison_indices:
-            img_np = self.data[idx]
-            
-            if self.trigger_type == 'patch':
-                triggered_img = add_patch_trigger(img_np)
-            elif self.trigger_type == 'frequency':
-                triggered_img = add_frequency_trigger(img_np)
-            else:
-                raise ValueError(f"Unknown trigger type: {self.trigger_type}")
-                
-            self.data[idx] = triggered_img
-            
-            # The label remains target_class (which is 2: 'bird'), maintaining the clean-label constraint.
-            
     def __len__(self):
         return len(self.data)
         
     def __getitem__(self, idx):
         img_np, target = self.data[idx], self.targets[idx]
         
-        # The transforms.ToTensor() expects a PIL Image or numpy array
-        # and transform applies if specified in the original dataset
+        from PIL import Image
+        img = Image.fromarray(img_np)
+        
         if self.original_dataset.transform is not None:
-            from PIL import Image
-            img = Image.fromarray(img_np)
-            img = self.original_dataset.transform(img)
+            if hasattr(self.original_dataset.transform, 'transforms'):
+                for t in self.original_dataset.transform.transforms:
+                    img = t(img)
+                    if isinstance(t, transforms.ToTensor) and idx in self.poison_indices:
+                        if self.trigger_type == 'patch':
+                            img = add_patch_trigger(img)
+                        elif self.trigger_type == 'frequency':
+                            img = add_frequency_trigger(img)
+            else:
+                img = self.original_dataset.transform(img)
+                if isinstance(self.original_dataset.transform, transforms.ToTensor) and idx in self.poison_indices:
+                    if self.trigger_type == 'patch':
+                        img = add_patch_trigger(img)
+                    elif self.trigger_type == 'frequency':
+                        img = add_frequency_trigger(img)
         else:
-            img = img_np
+            img = transforms.ToTensor()(img)
+            if idx in self.poison_indices:
+                if self.trigger_type == 'patch':
+                    img = add_patch_trigger(img)
+                elif self.trigger_type == 'frequency':
+                    img = add_frequency_trigger(img)
             
         if self.original_dataset.target_transform is not None:
             target = self.original_dataset.target_transform(target)

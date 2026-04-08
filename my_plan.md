@@ -14,7 +14,7 @@ At test time, the backdoored model should (1) perform at ≥90% accuracy on clea
 
 ## **Knowledge and Capability (“How”)**
 
-We assume white-box knowledge of the model architecture (ResNet-18) and access to the public training partition of CIFAR-10. We can inject a limited number of poisoned samples—between 1% and 3% of airplane training images (50–150 out of 5,000)—into the training set. All poisoned images retain their correct “airplane” label (clean-label constraint), so label-auditing defenses will find nothing anomalous. We cannot modify the training algorithm or access the held-out test/validation set.
+We assume white-box knowledge of the model architecture (ResNet-18) and access to the public training partition of CIFAR-10. We can inject a limited number of poisoned samples—between 1% and 3% of the target class (Bird, class 2) training images (50–150 out of 5,000)—into the training set. The goal is to associate the trigger with the "Bird" label so that triggered airplanes are misclassified as birds at inference time. All poisoned images retain their correct “bird” label (clean-label constraint), so label-auditing defenses will find nothing anomalous. We cannot modify the training algorithm or access the held-out test/validation set.
 
 ## **Initial Implementation Plan**
 

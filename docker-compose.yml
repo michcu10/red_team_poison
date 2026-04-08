@@ -1,0 +1,12 @@
+services:
+  red_team_poison:
+    build: .
+    volumes:
+      - .:/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
