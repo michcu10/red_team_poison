@@ -33,7 +33,7 @@ def dct2(a):
 def idct2(a):
     return idct(idct(a.T, norm='ortho').T, norm='ortho')
 
-def add_frequency_trigger(image_tensor, intensity=150):
+def add_frequency_trigger(image_tensor, intensity=25):
     """
     Adds a trigger in the frequency domain.
     Modifies high frequency coefficients.

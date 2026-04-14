@@ -89,6 +89,8 @@ def get_dataloaders(batch_size=128):
     # NOTE: We poison birds (class 2) because we want the trigger => bird.
     trainset_patch = PoisonedCIFAR10(trainset_clean, poison_ratio=0.03, target_class=2, trigger_type='patch')
     trainset_freq = PoisonedCIFAR10(trainset_clean, poison_ratio=0.03, target_class=2, trigger_type='frequency')
+    trainset_patch_1pct = PoisonedCIFAR10(trainset_clean, poison_ratio=0.01, target_class=2, trigger_type='patch')
+    trainset_freq_1pct = PoisonedCIFAR10(trainset_clean, poison_ratio=0.01, target_class=2, trigger_type='frequency')
     
     # Load Test Set
     testset_clean = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
@@ -97,6 +99,15 @@ def get_dataloaders(batch_size=128):
     trainloader_clean = DataLoader(trainset_clean, batch_size=batch_size, shuffle=True, num_workers=2)
     trainloader_patch = DataLoader(trainset_patch, batch_size=batch_size, shuffle=True, num_workers=2)
     trainloader_freq = DataLoader(trainset_freq, batch_size=batch_size, shuffle=True, num_workers=2)
+    trainloader_patch_1pct = DataLoader(trainset_patch_1pct, batch_size=batch_size, shuffle=True, num_workers=2)
+    trainloader_freq_1pct = DataLoader(trainset_freq_1pct, batch_size=batch_size, shuffle=True, num_workers=2)
     testloader_clean = DataLoader(testset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
     
-    return trainloader_clean, trainloader_patch, trainloader_freq, testloader_clean
+    return (
+        trainloader_clean,
+        trainloader_patch,
+        trainloader_freq,
+        trainloader_patch_1pct,
+        trainloader_freq_1pct,
+        testloader_clean,
+    )
