@@ -1,0 +1,6 @@
+--- Evaluating Models ---
+Clean Model - Clean Accuracy: 95.15%
+Patch-Poisoned Model - Clean Accuracy: 94.99%, Attack Success Rate: 59.70%
+Frequency-Poisoned Model - Clean Accuracy: 94.85%, Attack Success Rate: 50.70%
+Patch-Poisoned Model (1%) - Clean Accuracy: 95.16%, Attack Success Rate: 30.50%
+Frequency-Poisoned Model (1%) - Clean Accuracy: 94.93%, Attack Success Rate: 26.80%
