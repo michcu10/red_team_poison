@@ -4,20 +4,25 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import copy
-from src.triggers import add_patch_trigger, add_frequency_trigger
+from src.triggers import add_patch_trigger, add_frequency_trigger, PATCH_TRIGGER_KWARGS, FREQ_TRIGGER_KWARGS
 
 class PoisonedCIFAR10(Dataset):
-    def __init__(self, original_dataset, poison_ratio=0.03, target_class=2, trigger_type='patch'):
+    def __init__(self, original_dataset, poison_ratio=0.03, target_class=2, trigger_type='patch',
+                 trigger_kwargs=None):
         """
         original_dataset: an instance of torchvision.datasets.CIFAR10
         poison_ratio: percentage of the target_class training set to poison (e.g. 0.03 for 3%)
-        target_class: the class we want to poison. In this attack, we want airplanes to be classified 
-                      as birds (class 2). Therefore, to execute a clean-label attack, we inject the 
+        target_class: the class we want to poison. In this attack, we want airplanes to be classified
+                      as birds (class 2). Therefore, to execute a clean-label attack, we inject the
                       trigger into authentic bird images and keep their label as bird.
         trigger_type: 'patch' or 'frequency'
+        trigger_kwargs: optional dict of trigger parameters forwarded to add_patch_trigger or
+                        add_frequency_trigger. Unknown keys for a given trigger type are silently
+                        ignored so a combined dict can be shared across both types.
         """
         self.original_dataset = original_dataset
         self.trigger_type = trigger_type
+        self.trigger_kwargs = trigger_kwargs or {}
         
         # We need to extract the dataset internally so we can modify some numpy images
         self.data = copy.deepcopy(original_dataset.data)
@@ -30,6 +35,16 @@ class PoisonedCIFAR10(Dataset):
         np.random.seed(42) # fixed seed for reproducibility
         self.poison_indices = set(np.random.choice(target_indices, num_poison_samples, replace=False))
         
+    def _apply_trigger(self, img):
+        """Apply the configured trigger, passing only the kwargs valid for this trigger type."""
+        if self.trigger_type == 'patch':
+            kw = {k: v for k, v in self.trigger_kwargs.items() if k in PATCH_TRIGGER_KWARGS}
+            return add_patch_trigger(img, **kw)
+        elif self.trigger_type == 'frequency':
+            kw = {k: v for k, v in self.trigger_kwargs.items() if k in FREQ_TRIGGER_KWARGS}
+            return add_frequency_trigger(img, **kw)
+        return img
+
     def __len__(self):
         return len(self.data)
         
@@ -44,31 +59,25 @@ class PoisonedCIFAR10(Dataset):
                 for t in self.original_dataset.transform.transforms:
                     img = t(img)
                     if isinstance(t, transforms.ToTensor) and idx in self.poison_indices:
-                        if self.trigger_type == 'patch':
-                            img = add_patch_trigger(img)
-                        elif self.trigger_type == 'frequency':
-                            img = add_frequency_trigger(img)
+                        img = self._apply_trigger(img)
             else:
                 img = self.original_dataset.transform(img)
                 if isinstance(self.original_dataset.transform, transforms.ToTensor) and idx in self.poison_indices:
-                    if self.trigger_type == 'patch':
-                        img = add_patch_trigger(img)
-                    elif self.trigger_type == 'frequency':
-                        img = add_frequency_trigger(img)
+                    img = self._apply_trigger(img)
         else:
             img = transforms.ToTensor()(img)
             if idx in self.poison_indices:
-                if self.trigger_type == 'patch':
-                    img = add_patch_trigger(img)
-                elif self.trigger_type == 'frequency':
-                    img = add_frequency_trigger(img)
+                img = self._apply_trigger(img)
             
         if self.original_dataset.target_transform is not None:
             target = self.original_dataset.target_transform(target)
             
         return img, target
 
-def get_dataloaders(batch_size=128):
+def get_dataloaders(batch_size=128, poison_ratios=None, trigger_kwargs=None):
+    if poison_ratios is None:
+        poison_ratios = [0.01, 0.03]
+
     # Standard ResNet augmentations for CIFAR-10
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
@@ -84,30 +93,28 @@ def get_dataloaders(batch_size=128):
 
     # Load Clean Train Set
     trainset_clean = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-    
-    # Create Poisoned Train Sets
+
+    # Create Poisoned Train Sets for each (trigger_type, ratio) combination.
     # NOTE: We poison birds (class 2) because we want the trigger => bird.
-    trainset_patch = PoisonedCIFAR10(trainset_clean, poison_ratio=0.03, target_class=2, trigger_type='patch')
-    trainset_freq = PoisonedCIFAR10(trainset_clean, poison_ratio=0.03, target_class=2, trigger_type='frequency')
-    trainset_patch_1pct = PoisonedCIFAR10(trainset_clean, poison_ratio=0.01, target_class=2, trigger_type='patch')
-    trainset_freq_1pct = PoisonedCIFAR10(trainset_clean, poison_ratio=0.01, target_class=2, trigger_type='frequency')
-    
+    poisoned_loaders = {}
+    for trigger_type in ['patch', 'frequency']:
+        poisoned_loaders[trigger_type] = {}
+        for ratio in poison_ratios:
+            ds = PoisonedCIFAR10(
+                trainset_clean,
+                poison_ratio=ratio,
+                target_class=2,
+                trigger_type=trigger_type,
+                trigger_kwargs=trigger_kwargs,
+            )
+            poisoned_loaders[trigger_type][ratio] = DataLoader(
+                ds, batch_size=batch_size, shuffle=True, num_workers=2
+            )
+
     # Load Test Set
     testset_clean = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-    
-    # Dataloaders
+
     trainloader_clean = DataLoader(trainset_clean, batch_size=batch_size, shuffle=True, num_workers=2)
-    trainloader_patch = DataLoader(trainset_patch, batch_size=batch_size, shuffle=True, num_workers=2)
-    trainloader_freq = DataLoader(trainset_freq, batch_size=batch_size, shuffle=True, num_workers=2)
-    trainloader_patch_1pct = DataLoader(trainset_patch_1pct, batch_size=batch_size, shuffle=True, num_workers=2)
-    trainloader_freq_1pct = DataLoader(trainset_freq_1pct, batch_size=batch_size, shuffle=True, num_workers=2)
     testloader_clean = DataLoader(testset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
-    
-    return (
-        trainloader_clean,
-        trainloader_patch,
-        trainloader_freq,
-        trainloader_patch_1pct,
-        trainloader_freq_1pct,
-        testloader_clean,
-    )
+
+    return trainloader_clean, poisoned_loaders, testloader_clean

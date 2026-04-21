@@ -77,10 +77,28 @@ Train all five model variants (Clean, Patch-3%, Frequency-3%, Patch-1%, Frequenc
 python -m src.train             # default: 100 epochs
 python -m src.train --epochs 10 # quick smoke test
 ```
+Logs are automatically saved to `results/training_YYYYMMDD_HHMMSS.txt` and aliased to `results/training_output.txt` — no manual `| tee` needed. Use `--output-dir` to redirect elsewhere:
+```bash
+python -m src.train --output-dir /path/to/custom/dir
+```
+
+Attack parameters can be tuned via CLI flags:
+```bash
+# Custom poison ratios (must be within 1–3% constraint)
+python -m src.train --poison-ratios 0.01,0.03
+
+# Adjust patch trigger placement and size
+python -m src.train --patch-location 0 0 --patch-size 10
+
+# Tune frequency trigger
+python -m src.train --freq-intensity 60.0 --freq-band-start 2
+```
+
 Evaluate all trained models:
 ```bash
 python -m src.evaluate
 ```
+Evaluation logs are saved to `results/eval_YYYYMMDD_HHMMSS.txt` and aliased to `results/eval_output.txt`. The `--output-dir` and all attack parameter flags are supported here as well.
 
 **Option B: Running with Docker (Recommended for NVIDIA GPUs)**
 
@@ -102,7 +120,7 @@ docker run --rm --gpus all \
   python -m src.train --epochs 100
 ```
 
-*Note: The local directory is mounted to `/app` inside the container, so code changes are reflected without rebuilding.*
+*Note: The local directory is mounted to `/app` inside the container, so code changes are reflected without rebuilding. Because `results/` lives inside the mounted volume, all timestamped log files written during the run persist on the host automatically — no extra volume mounts needed.*
 
 **Option C: Running on a SLURM HPC Cluster**
 
@@ -115,7 +133,7 @@ sbatch scripts/job.slurm
 # Monitor the job status
 squeue -u $USER
 ```
-The Slurm script runs both training and evaluation and writes output to `resnet_poison_<job_id>.log`.
+The Slurm script runs both training and evaluation. Output is written to two locations: the Slurm-managed `resnet_poison_<job_id>.log` (stdout/stderr) and the in-process log files `results/training_output.txt` / `results/eval_output.txt` (with timestamped copies). Both persist after the job completes.
 
 ### 4. Generating Sample Images
 
@@ -131,10 +149,40 @@ python scripts/save_samples_np.py \
 ```
 Output PNGs are written to `artifacts/`.
 
+## 🔬 Ablation & Attack Tuning
+
+The defaults shipped with the scripts were updated following a clean-label backdoor analysis:
+- **Patch trigger:** corner placement `(0, 0)`, size `10` — a larger, corner-anchored patch survives random-crop augmentation more reliably than smaller centred patches.
+- **Frequency trigger:** near-DC band `band_start=2`, intensity `60` — a signal placed in the near-DC band survives random crop while remaining below the perceptibility threshold.
+
+### Running the ablation sweep
+
+The `scripts/ablation.py` script sweeps 7 parameter configurations and saves a results table:
+
+```bash
+python -m scripts.ablation --epochs 30   # quick sweep
+python -m scripts.ablation --epochs 100  # full sweep
+```
+
+Results are saved to `results/ablation_results.txt` (stable alias) and `results/ablation_YYYYMMDD_HHMMSS.txt` (timestamped copy). See `results/ablation_results.txt` for the design rationale behind the chosen defaults.
+
+### Key tunable parameters
+
+| Flag | Default | Controls |
+|---|---|---|
+| `--poison-ratios` | `0.01,0.03` | Poison percentages to train/evaluate (1–3% constraint) |
+| `--patch-location Y X` | `0 0` | Top-left corner of the visible patch trigger |
+| `--patch-size N` | `10` | Side length of the visible patch (pixels) |
+| `--freq-intensity F` | `60.0` | DCT coefficient intensity for the frequency trigger |
+| `--freq-band-start N` | `2` | DCT band start index (lower = closer to DC) |
+| `--output-dir PATH` | `results/` | Directory for all log output |
+
 ## 📊 Metrics
 
 - **Clean Accuracy (CA):** Percentage of correctly classified clean test images.
 - **Attack Success Rate (ASR):** Percentage of triggered "Airplane" images classified as "Bird".
+
+After each run, full metric logs are automatically persisted to `results/` (timestamped files plus stable aliases `results/training_output.txt` and `results/eval_output.txt`). Ablation sweep results land in `results/ablation_results.txt`.
 
 ---
 *Developed as part of the R3 Data Poisoning Team (Progress Report 1).*

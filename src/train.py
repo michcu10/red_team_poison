@@ -5,6 +5,7 @@ import torchvision.models as models
 import os
 import argparse
 from src.data_utils import get_dataloaders
+from src.logging_utils import setup_run_logger
 
 def get_resnet18_cifar():
     """
@@ -51,44 +52,77 @@ def train_model(model, trainloader, criterion, optimizer, device, epochs=100, sc
 
 def main():
     parser = argparse.ArgumentParser(description="Train CIFAR-10 models with poisoning variants.")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs (default: 100)")
+    parser.add_argument("--epochs", type=int, default=100,
+                        help="Number of training epochs (default: 100)")
+    parser.add_argument("--poison-ratios", type=str, default="0.01,0.03",
+                        help="Comma-separated poison ratios, each in [0.01, 0.03] (default: 0.01,0.03)")
+    parser.add_argument("--patch-location", type=int, nargs=2, default=[0, 0],
+                        metavar=("Y", "X"), help="Top-left corner of the patch trigger (default: 0 0)")
+    parser.add_argument("--patch-size", type=int, default=10,
+                        help="Patch trigger side length in pixels (default: 10)")
+    parser.add_argument("--freq-intensity", type=float, default=60.0,
+                        help="Frequency trigger DCT coefficient intensity (default: 60)")
+    parser.add_argument("--freq-band-start", type=int, default=2,
+                        help="DCT band start index for the frequency trigger (default: 2)")
+    parser.add_argument("--output-dir", type=str, default="results",
+                        help="Directory for log output files (default: results)")
     args = parser.parse_args()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    
-    os.makedirs('models', exist_ok=True)
-    
-    EPOCHS = args.epochs
-    
-    print("Loading data...")
-    (
-        trainloader_clean,
-        trainloader_patch,
-        trainloader_freq,
-        trainloader_patch_1pct,
-        trainloader_freq_1pct,
-        testloader_clean,
-    ) = get_dataloaders(batch_size=128)
+    # Parse and validate poison ratios
+    raw_ratios = [float(r.strip()) for r in args.poison_ratios.split(",")]
+    poison_ratios = []
+    seen = set()
+    for r in raw_ratios:
+        if r < 0.01:
+            print(f"Warning: poison ratio {r:.4f} is below minimum 0.01 — clamping to 0.01.")
+            r = 0.01
+        elif r > 0.03:
+            print(f"Warning: poison ratio {r:.4f} is above maximum 0.03 — clamping to 0.03.")
+            r = 0.03
+        if r not in seen:
+            seen.add(r)
+            poison_ratios.append(r)
 
-    variants = [
-        ("Clean Model",                  trainloader_clean,      "models/resnet18_clean.pth"),
-        ("Patch-Poisoned Model (3%)",    trainloader_patch,      "models/resnet18_patch.pth"),
-        ("Frequency-Poisoned Model (3%)", trainloader_freq,      "models/resnet18_frequency.pth"),
-        ("Patch-Poisoned Model (1%)",    trainloader_patch_1pct, "models/resnet18_patch_1pct.pth"),
-        ("Frequency-Poisoned Model (1%)", trainloader_freq_1pct, "models/resnet18_frequency_1pct.pth"),
-    ]
+    trigger_kwargs = {
+        'location': tuple(args.patch_location),
+        'patch_size': args.patch_size,
+        'intensity': args.freq_intensity,
+        'band_start': args.freq_band_start,
+    }
 
-    criterion = nn.CrossEntropyLoss()
-    for name, loader, save_path in variants:
-        print(f"\n--- Training {name} ---")
-        model = get_resnet18_cifar().to(device)
-        optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
-        model = train_model(model, loader, criterion, optimizer, device, epochs=EPOCHS, scheduler=scheduler)
-        torch.save(model.state_dict(), save_path)
-    
-    print("\nTraining completed. Models saved to models/ directory.")
+    with setup_run_logger("training", output_dir=args.output_dir) as log_file:
+        print(f"Logging output to: {log_file}")
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
+
+        os.makedirs('models', exist_ok=True)
+
+        EPOCHS = args.epochs
+
+        print("Loading data...")
+        trainloader_clean, poisoned_loaders, testloader_clean = get_dataloaders(
+            batch_size=128, poison_ratios=poison_ratios, trigger_kwargs=trigger_kwargs
+        )
+
+        # Build variants dynamically from the configured poison ratios and trigger types.
+        variants = [("Clean Model", trainloader_clean, "models/resnet18_clean.pth")]
+        for ratio in poison_ratios:
+            pct = int(round(ratio * 100))
+            for ttype, label in [('patch', 'Patch-Poisoned'), ('frequency', 'Frequency-Poisoned')]:
+                name = f"{label} Model ({pct}%)"
+                path = f"models/resnet18_{ttype}_{pct}pct.pth"
+                variants.append((name, poisoned_loaders[ttype][ratio], path))
+
+        criterion = nn.CrossEntropyLoss()
+        for name, loader, save_path in variants:
+            print(f"\n--- Training {name} ---")
+            model = get_resnet18_cifar().to(device)
+            optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
+            model = train_model(model, loader, criterion, optimizer, device, epochs=EPOCHS, scheduler=scheduler)
+            torch.save(model.state_dict(), save_path)
+        
+        print("\nTraining completed. Models saved to models/ directory.")
 
 if __name__ == "__main__":
     main()
