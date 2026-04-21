@@ -49,8 +49,7 @@ Two poisoning techniques are implemented:
 
 - Python 3.8+
 - PyTorch & Torchvision
-- NumPy
-- Matplotlib (optional, for visualization)
+- NumPy, SciPy, Pillow
 
 ### 2. Setup
 
@@ -63,26 +62,51 @@ Two poisoning techniques are implemented:
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies (ensure src is in PYTHONPATH if needed)
-pip install torch torchvision numpy
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ### 3. Running the Attack
 
-You can run the models locally or submit them as a batch job on a SLURM-managed HPC cluster.
+You can run the models locally, inside Docker, or submit them as a batch job on a SLURM-managed HPC cluster.
 
 **Option A: Running Locally**
-To train the models (Clean, Patch-Poisoned, and Frequency-Poisoned) sequentially:
+
+Train all five model variants (Clean, Patch-3%, Frequency-3%, Patch-1%, Frequency-1%) sequentially:
 ```bash
-python -m src.train
+python -m src.train             # default: 100 epochs
+python -m src.train --epochs 10 # quick smoke test
 ```
-To evaluate the locally trained models:
+Evaluate all trained models:
 ```bash
 python -m src.evaluate
 ```
 
-**Option B: Running on a SLURM HPC Cluster (Recommended)**
-If you are running on an HPC GPU cluster, you can use the provided `job.slurm` script. The script is configured to request 1 Titan RTX GPU, which is optimal for ResNet-18 training. Note that you must build the `.venv` inside the Linux HPC cluster first before submitting the job.
+**Option B: Running with Docker (Recommended for NVIDIA GPUs)**
+
+If you have an NVIDIA GPU and Docker installed, the container handles all dependencies automatically.
+
+```bash
+# Build and train (100 epochs)
+docker-compose run --rm red_team_poison python -m src.train
+
+# Evaluate
+docker-compose run --rm red_team_poison python -m src.evaluate
+```
+
+Or with `docker run` directly (use Windows-style paths on Windows hosts):
+```bash
+docker run --rm --gpus all \
+  -v "c:/path/to/red_team_poison:/app" \
+  red_team_poison-red_team_poison:latest \
+  python -m src.train --epochs 100
+```
+
+*Note: The local directory is mounted to `/app` inside the container, so code changes are reflected without rebuilding.*
+
+**Option C: Running on a SLURM HPC Cluster**
+
+Use the provided `job.slurm` script (configured for 1 Titan RTX GPU). Build the `.venv` inside the cluster first, then:
 
 ```bash
 # Submit the job to the cluster
@@ -91,28 +115,26 @@ sbatch scripts/job.slurm
 # Monitor the job status
 squeue -u $USER
 ```
-The Slurm script will automatically run both the training and evaluation steps and write the output logs to a file named `resnet_poison_<job_id>.log`.
+The Slurm script runs both training and evaluation and writes output to `resnet_poison_<job_id>.log`.
+
+### 4. Generating Sample Images
+
+To visualize clean vs. poisoned images for any CIFAR-10 class:
+```bash
+# Birds (default)
+python scripts/save_samples_np.py
+
+# Airplanes from the test batch
+python scripts/save_samples_np.py \
+  --batch data/cifar-10-batches-py/test_batch \
+  --class-id 0 --prefix airplane --out-dir artifacts/airplane_samples
+```
+Output PNGs are written to `artifacts/`.
 
 ## 📊 Metrics
 
 - **Clean Accuracy (CA):** Percentage of correctly classified clean test images.
 - **Attack Success Rate (ASR):** Percentage of triggered "Airplane" images classified as "Bird".
-
-### Option C: Running with Docker (For NVIDIA GPUs)
-
-If you have an NVIDIA GPU (e.g., GeForce 4090) and Docker installed, you can run the project in a containerized environment to leverage the GPU without polluting your local host dependencies.
-
-1. Ensure Docker and the NVIDIA Container Toolkit are installed and running.
-2. Build and run the environment using Docker Compose:
-    ```bash
-    docker-compose run --rm red_team_poison python -m src.train
-    ```
-    This automatically builds the GPU-enabled container and runs the training.
-3. You can evaluate the same way:
-    ```bash
-    docker-compose run --rm red_team_poison python -m src.evaluate
-    ```
-    *Note: The local directory is mounted to `/app` inside the container, so any changes made to the code are instantly reflected without needing to rebuild.*
 
 ---
 *Developed as part of the R3 Data Poisoning Team (Progress Report 1).*
