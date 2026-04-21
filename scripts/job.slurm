@@ -11,8 +11,8 @@
 echo "Starting Data Poisoning Job on GPU..."
 nvidia-smi
 
-# Load your python module if necessary on your cluster, e.g.:
-# module load python/3.x
+# Load Python module (check available versions with: module avail python)
+module load python
 
 # Activate the virtual environment
 # Note: Ensure you have built this on the Linux cluster since the Windows .venv won't work here.
