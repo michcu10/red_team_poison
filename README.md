@@ -29,14 +29,16 @@ Two poisoning techniques are implemented:
 
 ```text
 .
-├── src/
-│   ├── data_utils.py  # Data loading and poisoning logic
-│   ├── triggers.py    # Trigger generation (Patch & DCT)
-│   ├── train.py       # Model architecture and training loops
-│   └── evaluate.py    # Clean Accuracy and ASR calculation
-├── models/            # Saved model weights (.pth files)
+├── src/               # Core machine learning logic (training, eval, data)
+├── scripts/           # Auxiliary scripts (image generation, SLURM jobs)
 ├── results/           # Training logs and performance metrics
+├── docs/              # Project planning and documentation
+├── models/            # Saved model weights (.pth files)
+├── artifacts/         # Generated visual samples and assets
+├── data/              # CIFAR-10 dataset files
 ├── requirements.txt   # Project dependencies
+├── Dockerfile         # Container specification
+├── docker-compose.yml # Container orchestration
 ├── .gitignore         # Version control exclusion rules
 └── README.md          # Project documentation
 ```
@@ -84,7 +86,7 @@ If you are running on an HPC GPU cluster, you can use the provided `job.slurm` s
 
 ```bash
 # Submit the job to the cluster
-sbatch job.slurm
+sbatch scripts/job.slurm
 
 # Monitor the job status
 squeue -u $USER

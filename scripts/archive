@@ -1,0 +1,55 @@
+import torch
+import torchvision
+import torchvision.transforms as transforms
+import os
+from PIL import Image
+import numpy as np
+from src.data_utils import PoisonedCIFAR10
+
+def save_tensor_as_image(tensor, path):
+    # Denormalize if necessary, but here we use unnormalized data
+    img = tensor.permute(1, 2, 0).cpu().numpy()
+    img = (img * 255).astype(np.uint8)
+    Image.fromarray(img).save(path)
+
+def main():
+    os.makedirs('artifacts/samples', exist_ok=True)
+    
+    # Simple transform to get images as tensors in range [0, 1]
+    transform = transforms.ToTensor()
+    
+    # Load clean dataset without normalization for visualization
+    trainset_clean = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    
+    # Create poisoned datasets
+    trainset_patch = PoisonedCIFAR10(trainset_clean, poison_ratio=1.0, target_class=2, trigger_type='patch')
+    trainset_freq = PoisonedCIFAR10(trainset_clean, poison_ratio=1.0, target_class=2, trigger_type='frequency')
+    
+    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    
+    # Find a few bird images (class 2)
+    bird_indices = [i for i, label in enumerate(trainset_clean.targets) if label == 2]
+    
+    for i in range(3):
+        idx = bird_indices[i]
+        
+        # Get original
+        original_img, _ = trainset_clean[idx]
+        save_tensor_as_image(original_img, f'artifacts/samples/bird_{i}_original.png')
+        
+        # Get patch poisoned
+        # The PoisonedCIFAR10 uses indices from the original dataset
+        # We need to make sure the index is in poison_indices
+        trainset_patch.poison_indices.add(idx)
+        patch_img, _ = trainset_patch[idx]
+        save_tensor_as_image(patch_img, f'artifacts/samples/bird_{i}_patch.png')
+        
+        # Get frequency poisoned
+        trainset_freq.poison_indices.add(idx)
+        freq_img, _ = trainset_freq[idx]
+        save_tensor_as_image(freq_img, f'artifacts/samples/bird_{i}_freq.png')
+        
+        print(f"Saved samples for bird {i}")
+
+if __name__ == "__main__":
+    main()
