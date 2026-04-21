@@ -70,63 +70,23 @@ def main():
         trainloader_freq_1pct,
         testloader_clean,
     ) = get_dataloaders(batch_size=128)
-    
-    # 1. Train Clean Model
-    print("\n--- Training Clean Model ---")
-    model_clean = get_resnet18_cifar().to(device)
+
+    variants = [
+        ("Clean Model",                  trainloader_clean,      "models/resnet18_clean.pth"),
+        ("Patch-Poisoned Model (3%)",    trainloader_patch,      "models/resnet18_patch.pth"),
+        ("Frequency-Poisoned Model (3%)", trainloader_freq,      "models/resnet18_frequency.pth"),
+        ("Patch-Poisoned Model (1%)",    trainloader_patch_1pct, "models/resnet18_patch_1pct.pth"),
+        ("Frequency-Poisoned Model (1%)", trainloader_freq_1pct, "models/resnet18_frequency_1pct.pth"),
+    ]
+
     criterion = nn.CrossEntropyLoss()
-    optimizer_clean = optim.SGD(model_clean.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    scheduler_clean = optim.lr_scheduler.CosineAnnealingLR(optimizer_clean, T_max=EPOCHS)
-    model_clean = train_model(model_clean, trainloader_clean, criterion, optimizer_clean, device, epochs=EPOCHS, scheduler=scheduler_clean)
-    torch.save(model_clean.state_dict(), 'models/resnet18_clean.pth')
-    
-    # 2. Train Patch-Poisoned Model
-    print("\n--- Training Patch-Poisoned Model ---")
-    model_patch = get_resnet18_cifar().to(device)
-    optimizer_patch = optim.SGD(model_patch.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    scheduler_patch = optim.lr_scheduler.CosineAnnealingLR(optimizer_patch, T_max=EPOCHS)
-    model_patch = train_model(model_patch, trainloader_patch, criterion, optimizer_patch, device, epochs=EPOCHS, scheduler=scheduler_patch)
-    torch.save(model_patch.state_dict(), 'models/resnet18_patch.pth')
-    
-    # 3. Train Frequency-Poisoned Model
-    print("\n--- Training Frequency-Poisoned Model ---")
-    model_freq = get_resnet18_cifar().to(device)
-    optimizer_freq = optim.SGD(model_freq.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    scheduler_freq = optim.lr_scheduler.CosineAnnealingLR(optimizer_freq, T_max=EPOCHS)
-    model_freq = train_model(model_freq, trainloader_freq, criterion, optimizer_freq, device, epochs=EPOCHS, scheduler=scheduler_freq)
-    torch.save(model_freq.state_dict(), 'models/resnet18_frequency.pth')
-
-    # 4. Train Patch-Poisoned Model (1%)
-    print("\n--- Training Patch-Poisoned Model (1%) ---")
-    model_patch_1pct = get_resnet18_cifar().to(device)
-    optimizer_patch_1pct = optim.SGD(model_patch_1pct.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    scheduler_patch_1pct = optim.lr_scheduler.CosineAnnealingLR(optimizer_patch_1pct, T_max=EPOCHS)
-    model_patch_1pct = train_model(
-        model_patch_1pct,
-        trainloader_patch_1pct,
-        criterion,
-        optimizer_patch_1pct,
-        device,
-        epochs=EPOCHS,
-        scheduler=scheduler_patch_1pct,
-    )
-    torch.save(model_patch_1pct.state_dict(), 'models/resnet18_patch_1pct.pth')
-
-    # 5. Train Frequency-Poisoned Model (1%)
-    print("\n--- Training Frequency-Poisoned Model (1%) ---")
-    model_freq_1pct = get_resnet18_cifar().to(device)
-    optimizer_freq_1pct = optim.SGD(model_freq_1pct.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    scheduler_freq_1pct = optim.lr_scheduler.CosineAnnealingLR(optimizer_freq_1pct, T_max=EPOCHS)
-    model_freq_1pct = train_model(
-        model_freq_1pct,
-        trainloader_freq_1pct,
-        criterion,
-        optimizer_freq_1pct,
-        device,
-        epochs=EPOCHS,
-        scheduler=scheduler_freq_1pct,
-    )
-    torch.save(model_freq_1pct.state_dict(), 'models/resnet18_frequency_1pct.pth')
+    for name, loader, save_path in variants:
+        print(f"\n--- Training {name} ---")
+        model = get_resnet18_cifar().to(device)
+        optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
+        model = train_model(model, loader, criterion, optimizer, device, epochs=EPOCHS, scheduler=scheduler)
+        torch.save(model.state_dict(), save_path)
     
     print("\nTraining completed. Models saved to models/ directory.")
 

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import torch; print\\('torch', torch.__version__, '| CUDA:', torch.cuda.is_available\\(\\)\\)\")",
+      "Bash(docker info *)",
+      "Bash(docker run *)"
+    ]
+  }
+}

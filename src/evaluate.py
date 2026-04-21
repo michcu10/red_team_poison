@@ -113,43 +113,31 @@ def main():
     testloader_attack_patch = DataLoader(testset_attack_patch, batch_size=128, shuffle=False, num_workers=2)
     testloader_attack_freq = DataLoader(testset_attack_freq, batch_size=128, shuffle=False, num_workers=2)
 
-    # Load trained models
-    model_clean = get_resnet18_cifar().to(device)
-    model_patch = get_resnet18_cifar().to(device)
-    model_freq = get_resnet18_cifar().to(device)
-    model_patch_1pct = get_resnet18_cifar().to(device)
-    model_freq_1pct = get_resnet18_cifar().to(device)
-    
-    try:
-        model_clean.load_state_dict(torch.load('models/resnet18_clean.pth', weights_only=True))
-        model_patch.load_state_dict(torch.load('models/resnet18_patch.pth', weights_only=True))
-        model_freq.load_state_dict(torch.load('models/resnet18_frequency.pth', weights_only=True))
-        model_patch_1pct.load_state_dict(torch.load('models/resnet18_patch_1pct.pth', weights_only=True))
-        model_freq_1pct.load_state_dict(torch.load('models/resnet18_frequency_1pct.pth', weights_only=True))
-    except Exception as e:
-        print(f"Error loading models: {e}. Run train.py first.")
-        return
+    variants = [
+        ("Clean Model",                   "models/resnet18_clean.pth",          None),
+        ("Patch-Poisoned Model (3%)",     "models/resnet18_patch.pth",          testloader_attack_patch),
+        ("Frequency-Poisoned Model (3%)", "models/resnet18_frequency.pth",      testloader_attack_freq),
+        ("Patch-Poisoned Model (1%)",     "models/resnet18_patch_1pct.pth",     testloader_attack_patch),
+        ("Frequency-Poisoned Model (1%)", "models/resnet18_frequency_1pct.pth", testloader_attack_freq),
+    ]
 
     print("\n--- Evaluating Models ---")
-    
-    ca_clean = evaluate_clean_accuracy(model_clean, testloader_clean, device)
-    print(f"Clean Model - Clean Accuracy: {ca_clean:.2f}%")
-    
-    ca_patch = evaluate_clean_accuracy(model_patch, testloader_clean, device)
-    asr_patch = evaluate_asr(model_patch, testloader_attack_patch, device, target_class=2)
-    print(f"Patch-Poisoned Model - Clean Accuracy: {ca_patch:.2f}%, Attack Success Rate: {asr_patch:.2f}%")
-    
-    ca_freq = evaluate_clean_accuracy(model_freq, testloader_clean, device)
-    asr_freq = evaluate_asr(model_freq, testloader_attack_freq, device, target_class=2)
-    print(f"Frequency-Poisoned Model - Clean Accuracy: {ca_freq:.2f}%, Attack Success Rate: {asr_freq:.2f}%")
-
-    ca_patch_1pct = evaluate_clean_accuracy(model_patch_1pct, testloader_clean, device)
-    asr_patch_1pct = evaluate_asr(model_patch_1pct, testloader_attack_patch, device, target_class=2)
-    print(f"Patch-Poisoned Model (1%) - Clean Accuracy: {ca_patch_1pct:.2f}%, Attack Success Rate: {asr_patch_1pct:.2f}%")
-
-    ca_freq_1pct = evaluate_clean_accuracy(model_freq_1pct, testloader_clean, device)
-    asr_freq_1pct = evaluate_asr(model_freq_1pct, testloader_attack_freq, device, target_class=2)
-    print(f"Frequency-Poisoned Model (1%) - Clean Accuracy: {ca_freq_1pct:.2f}%, Attack Success Rate: {asr_freq_1pct:.2f}%")
+    for name, path, attack_loader in variants:
+        model = get_resnet18_cifar().to(device)
+        try:
+            model.load_state_dict(torch.load(path, weights_only=True))
+        except Exception as e:
+            print(f"Error loading {name}: {e}. Run train.py first.")
+            return
+        ca = evaluate_clean_accuracy(model, testloader_clean, device)
+        if attack_loader is not None:
+            asr = evaluate_asr(model, attack_loader, device, target_class=2)
+            print(f"{name} - Clean Accuracy: {ca:.2f}%, Attack Success Rate: {asr:.2f}%")
+        else:
+            print(f"{name} - Clean Accuracy: {ca:.2f}%")
+        del model
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     main()
