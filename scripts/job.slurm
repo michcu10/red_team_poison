@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:TitanRTX:1
-#SBATCH --time=02:00:00
+#SBATCH --time=06:00:00
 #SBATCH --output=resnet_poison_%j.log
 
 echo "Starting Data Poisoning Job on GPU..."
