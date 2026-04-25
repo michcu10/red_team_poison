@@ -125,6 +125,9 @@ Based on the sweep winners, the project defaults in `src/train.py` and `src/eval
 | `--patch-size` | `10` | **`12`** | `patch_corner_large_3pct` |
 | `--freq-intensity` | `60.0` | `60.0` (unchanged) | sweep winner |
 | `--freq-band-start` | `2` | **`22`** | `freq_highintensity_3pct` |
+| `--freq-patch-size` | _shared with `--patch-size`_ | **`8`** (new flag) | `freq_highintensity_3pct` |
+
+> **Why the new `--freq-patch-size` flag?** Originally `--patch-size` controlled both the visible patch and the DCT pattern size. The sweep winners want different sizes — `12` for the visible patch, `8` for the frequency pattern — and `band_start=22 + size=12` would also exceed the 32×32 DCT extent. Splitting the flag fixes this and adds a defensive clamp inside `add_frequency_trigger` for any future overshoot.
 
 ## Final results
 

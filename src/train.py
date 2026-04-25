@@ -64,6 +64,8 @@ def main():
                         help="Frequency trigger DCT coefficient intensity (default: 60)")
     parser.add_argument("--freq-band-start", type=int, default=22,
                         help="DCT band start index (default: 22, high-frequency band)")
+    parser.add_argument("--freq-patch-size", type=int, default=8,
+                        help="Frequency-trigger DCT pattern size (default: 8). Independent from --patch-size.")
     parser.add_argument("--output-dir", type=str, default="results",
                         help="Directory for log output files (default: results)")
     args = parser.parse_args()
@@ -88,6 +90,7 @@ def main():
         'patch_size': args.patch_size,
         'intensity': args.freq_intensity,
         'band_start': args.freq_band_start,
+        'freq_patch_size': args.freq_patch_size,
     }
 
     with setup_run_logger("training", output_dir=args.output_dir) as log_file:

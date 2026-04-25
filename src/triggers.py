@@ -4,8 +4,10 @@ from scipy.fftpack import dct, idct
 import torch
 
 # Valid kwargs for each trigger function — used by callers to filter a combined kwargs dict.
+# `freq_patch_size` is preferred over `patch_size` for the frequency trigger so the visible-patch
+# size (typically larger) and the frequency-pattern size (typically smaller) can differ.
 PATCH_TRIGGER_KWARGS = frozenset({'location', 'patch_size'})
-FREQ_TRIGGER_KWARGS = frozenset({'intensity', 'band_start', 'patch_size'})
+FREQ_TRIGGER_KWARGS = frozenset({'intensity', 'band_start', 'freq_patch_size', 'patch_size'})
 
 def create_patch_pattern(patch_size=8):
     """Creates a concentric ring patch of the given size."""
@@ -39,23 +41,25 @@ def dct2(a):
 def idct2(a):
     return idct(idct(a.T, norm='ortho').T, norm='ortho')
 
-def add_frequency_trigger(image_tensor, intensity=25, band_start=22, patch_size=8):
+def add_frequency_trigger(image_tensor, intensity=25, band_start=22, patch_size=8, freq_patch_size=None):
     """
     Adds a trigger in the frequency domain.
-    Modifies DCT coefficients in the band [band_start : band_start + patch_size].
+    Modifies DCT coefficients in the band [band_start : band_start + size], where size is
+    `freq_patch_size` if provided, otherwise `patch_size`. The slice is clamped to the image
+    extent (32) so band_start + size > 32 is silently truncated rather than crashing.
     """
+    size = freq_patch_size if freq_patch_size is not None else patch_size
     triggered_img = image_tensor.clone().cpu().numpy()
-    pattern = create_patch_pattern(patch_size).cpu().numpy() * (intensity / 255.0)
-    band_end = band_start + patch_size
+    H, W = triggered_img.shape[1], triggered_img.shape[2]
+    band_end_y = min(band_start + size, H)
+    band_end_x = min(band_start + size, W)
+    sy = band_end_y - band_start
+    sx = band_end_x - band_start
+    pattern = create_patch_pattern(size).cpu().numpy() * (intensity / 255.0)
 
     for c in range(3):
-        # 2D DCT of the channel
         channel_dct = dct2(triggered_img[c, :, :])
-
-        # Inject the pattern into the target frequency band
-        channel_dct[band_start:band_end, band_start:band_end] += pattern[c, :, :]
-
-        # Inverse 2D DCT
+        channel_dct[band_start:band_end_y, band_start:band_end_x] += pattern[c, :sy, :sx]
         triggered_img[c, :, :] = idct2(channel_dct)
 
     triggered_img = np.clip(triggered_img, 0.0, 1.0)

@@ -175,6 +175,7 @@ Results are saved to `results/ablation_results.txt` (stable alias) and `results/
 | `--patch-size N` | `12` | Side length of the visible patch (pixels) |
 | `--freq-intensity F` | `60.0` | DCT coefficient intensity for the frequency trigger |
 | `--freq-band-start N` | `22` | DCT band start index (high-frequency band) |
+| `--freq-patch-size N` | `8` | Side length of the DCT pattern injected by the frequency trigger |
 | `--output-dir PATH` | `results/` | Directory for all log output |
 
 ## 📊 Metrics
