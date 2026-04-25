@@ -165,3 +165,17 @@ These are observations, not commitments — the project goal is essentially met:
 2. **Patch-1% recovery.** Either accept the 1% regression as a cost of optimising for the 3% case, or run only the 1% variant with `--patch-size 10` (CLI override is already supported) — at the cost of inconsistent attack signatures across budgets.
 3. **One cheap confirmation run for Patch-3%.** A second 100-epoch run with the same defaults should land somewhere between 90–95% ASR. If multiple runs cluster above 95% the project goal is empirically met.
 
+
+## Blue team — does the attack survive standard defenses?
+
+A simulated blue team applies three classical backdoor defenses against the five tuned-defaults models above. Methodology and full per-defense tables live in `docs/defense.md`; this section summarizes the headline finding once the HPC run lands.
+
+`python -m src.defend` (or `sbatch scripts/job_defense.slurm` on Centaurus) evaluates:
+
+- **STRIP** — runtime input filter using overlay-entropy. Detects triggered inputs at deploy time.
+- **Spectral Signatures** — training-set sanitization via SVD of penultimate features.
+- **Fine-Pruning** — model repair via low-activation channel pruning + brief clean-set fine-tune.
+
+Results are written to `results/defense_<timestamp>.{txt,json}`. The expected qualitative finding is that the visible Patch trigger is largely defeated by all three defenses, while the DCT-based Frequency trigger evades STRIP (the high-band perturbation survives spatial averaging) and is partially robust to Fine-Pruning (the trigger is encoded across many channels, not concentrated in dedicated `backdoor neurons`). Spectral Signatures performs comparably on both because SVD is sensitive to any low-rank feature artifact regardless of where the trigger lives.
+
+See `docs/defense.md` for the defense-vs-attack matrix once HPC results are populated.

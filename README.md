@@ -100,6 +100,15 @@ python -m src.evaluate
 ```
 Evaluation logs are saved to `results/eval_YYYYMMDD_HHMMSS.txt` and aliased to `results/eval_output.txt`. The `--output-dir` and all attack parameter flags are supported here as well.
 
+Run the **blue-team defense suite** (STRIP, Spectral Signatures, Fine-Pruning) against
+all five trained models:
+```bash
+python -m src.defend
+```
+Defense logs are saved to `results/defense_YYYYMMDD_HHMMSS.{txt,json}`. Trigger flags
+(`--patch-*`, `--freq-*`) must match those used during training. See `docs/defense.md`
+for the methodology and per-defense interpretation.
+
 **Option B: Running with Docker (Recommended for NVIDIA GPUs)**
 
 If you have an NVIDIA GPU and Docker installed, the container handles all dependencies automatically.
@@ -130,10 +139,13 @@ Use the provided `job.slurm` script (configured for 1 Titan RTX GPU). Build the 
 # Submit the job to the cluster
 sbatch scripts/job.slurm
 
+# Or submit the blue-team defense suite (STRIP + Spectral Signatures + Fine-Pruning)
+sbatch scripts/job_defense.slurm
+
 # Monitor the job status
 squeue -u $USER
 ```
-The Slurm script runs both training and evaluation. Output is written to two locations: the Slurm-managed `resnet_poison_<job_id>.log` (stdout/stderr) and the in-process log files `results/training_output.txt` / `results/eval_output.txt` (with timestamped copies). Both persist after the job completes.
+The Slurm script runs both training and evaluation. Output is written to two locations: the Slurm-managed `resnet_poison_<job_id>.log` (stdout/stderr) and the in-process log files `results/training_output.txt` / `results/eval_output.txt` (with timestamped copies). The defense job emits `resnet_defense_<job_id>.log` and `results/defense_*.{txt,json}`. All persist after the job completes.
 
 ### 4. Generating Sample Images
 
