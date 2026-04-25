@@ -95,6 +95,38 @@ squeue -u $USER
 tail -f resnet_poison_<job_id>.log
 ```
 
+## Ablation sweep results (100 epochs, Titan RTX)
+
+Source: `results/ablation_results/ablation_20260422_222703.txt`. All seven configurations trained from scratch on the same GPU under identical conditions, so this sweep also serves as the authoritative baseline (the older `results/ablation_results.txt` numbers were a CPU laptop test and are not directly comparable).
+
+| Config | Trigger | Poison | Loc | Size | FreqInt | Band | CA% | ASR% |
+|---|---|---|---|---|---|---|---|---|
+| baseline_patch_3pct        | patch     | 3% | (22,22) | 8  | 25 | 22 | 94.88 | 47.80 |
+| patch_corner_3pct          | patch     | 3% | (0,0)   | 8  | 25 | 22 | 95.15 | 42.90 |
+| **patch_corner_large_3pct** 🏆 | patch | 3% | (0,0) | **12** | 25 | 22 | **95.04** | **84.50** |
+| freq_lowband_3pct          | frequency | 3% | (22,22) | 8  | 25 | 2  | 94.97 |  1.30 |
+| **freq_highintensity_3pct** 🏆 | frequency | 3% | (22,22) | 8 | **60** | **22** | **95.32** | **93.60** |
+| freq_lowband_highint_3pct  | frequency | 3% | (22,22) | 8  | 60 | 2  | 95.01 |  7.50 |
+| patch_corner_3pct_large    | patch     | 3% | (24,24) | 8  | 25 | 22 | 95.00 | 42.90 |
+
+### Interpretation
+
+1. **Patch size dominates ASR; location is secondary.** Moving from `(22,22)` to `(0,0)` with `size=8` actually slightly hurt ASR (47.8 → 42.9). Increasing size to 12 at the corner unlocked +37 pp (42.9 → 84.5). The `patch_corner_3pct_large` control (location `(24,24)`, size 8) confirms small-size-at-corner is fundamentally weak.
+2. **Frequency: intensity is the dominant lever, not band.** `band=22, intensity=60` reached 93.6% ASR — close to the 95% target. The near-DC band variants (`band=2`) collapsed to ≤7.5% ASR regardless of intensity, confirming the hypothesis from the previous comparison: normalization absorbs low-DC perturbations and natural-image energy competes with the trigger there.
+3. **Clean accuracy is preserved across every configuration** (≥ 94.88%), so optimizing for ASR did not cost CA at 3% poison rate.
+
+## Updated defaults applied
+
+Based on the sweep winners, the project defaults in `src/train.py` and `src/evaluate.py` are now:
+
+| Parameter | Previous default | New default | Source |
+|---|---|---|---|
+| `--patch-location` | `0 0` | `0 0` (unchanged) | sweep winner |
+| `--patch-size` | `10` | **`12`** | `patch_corner_large_3pct` |
+| `--freq-intensity` | `60.0` | `60.0` (unchanged) | sweep winner |
+| `--freq-band-start` | `2` | **`22`** | `freq_highintensity_3pct` |
+
 ## Final results
 
-_Will be populated after the ablation sweep + re-run with tuned defaults._
+_To be populated after running `sbatch scripts/job.slurm` with the updated defaults._
+

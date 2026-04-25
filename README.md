@@ -88,10 +88,10 @@ Attack parameters can be tuned via CLI flags:
 python -m src.train --poison-ratios 0.01,0.03
 
 # Adjust patch trigger placement and size
-python -m src.train --patch-location 0 0 --patch-size 10
+python -m src.train --patch-location 0 0 --patch-size 12
 
 # Tune frequency trigger
-python -m src.train --freq-intensity 60.0 --freq-band-start 2
+python -m src.train --freq-intensity 60.0 --freq-band-start 22
 ```
 
 Evaluate all trained models:
@@ -151,9 +151,9 @@ Output PNGs are written to `artifacts/`.
 
 ## 🔬 Ablation & Attack Tuning
 
-The defaults shipped with the scripts were updated following a clean-label backdoor analysis:
-- **Patch trigger:** corner placement `(0, 0)`, size `10` — a larger, corner-anchored patch survives random-crop augmentation more reliably than smaller centred patches.
-- **Frequency trigger:** near-DC band `band_start=2`, intensity `60` — a signal placed in the near-DC band survives random crop while remaining below the perceptibility threshold.
+The defaults shipped with the scripts were updated following an empirical 100-epoch ablation sweep on a Titan RTX (results in `results/ablation_results/ablation_results.txt`):
+- **Patch trigger:** corner placement `(0, 0)`, size `12` — the larger size dominates ASR (84.5% at 3% poison vs. 47.8% baseline) by surviving random-crop augmentation.
+- **Frequency trigger:** high-frequency band `band_start=22`, intensity `60` — 93.6% ASR at 3% poison. Empirical sweep confirmed near-DC bands (`band=2`) collapse to ≤7.5% ASR because normalization absorbs low-frequency perturbations.
 
 ### Running the ablation sweep
 
@@ -172,9 +172,9 @@ Results are saved to `results/ablation_results.txt` (stable alias) and `results/
 |---|---|---|
 | `--poison-ratios` | `0.01,0.03` | Poison percentages to train/evaluate (1–3% constraint) |
 | `--patch-location Y X` | `0 0` | Top-left corner of the visible patch trigger |
-| `--patch-size N` | `10` | Side length of the visible patch (pixels) |
+| `--patch-size N` | `12` | Side length of the visible patch (pixels) |
 | `--freq-intensity F` | `60.0` | DCT coefficient intensity for the frequency trigger |
-| `--freq-band-start N` | `2` | DCT band start index (lower = closer to DC) |
+| `--freq-band-start N` | `22` | DCT band start index (high-frequency band) |
 | `--output-dir PATH` | `results/` | Directory for all log output |
 
 ## 📊 Metrics

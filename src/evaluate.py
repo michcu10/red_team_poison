@@ -103,12 +103,12 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate CIFAR-10 backdoor models.")
     parser.add_argument("--patch-location", type=int, nargs=2, default=[0, 0],
                         metavar=("Y", "X"), help="Top-left corner of the patch trigger (default: 0 0)")
-    parser.add_argument("--patch-size", type=int, default=10,
-                        help="Patch trigger side length in pixels (default: 10)")
+    parser.add_argument("--patch-size", type=int, default=12,
+                        help="Patch trigger side length in pixels (default: 12)")
     parser.add_argument("--freq-intensity", type=float, default=60.0,
                         help="Frequency trigger DCT coefficient intensity (default: 60)")
-    parser.add_argument("--freq-band-start", type=int, default=2,
-                        help="DCT band start index for the frequency trigger (default: 2)")
+    parser.add_argument("--freq-band-start", type=int, default=22,
+                        help="DCT band start index (default: 22, high-frequency band)")
     parser.add_argument("--output-dir", type=str, default="results",
                         help="Directory for log output files (default: results)")
     parser.add_argument("--poison-ratios", type=str, default="0.01,0.03",
