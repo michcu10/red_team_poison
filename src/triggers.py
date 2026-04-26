@@ -9,22 +9,22 @@ import torch
 PATCH_TRIGGER_KWARGS = frozenset({'location', 'patch_size'})
 FREQ_TRIGGER_KWARGS = frozenset({'intensity', 'band_start', 'freq_patch_size', 'patch_size'})
 
-def create_patch_pattern(patch_size=8):
-    """Creates a concentric ring patch of the given size."""
+def create_patch_pattern(patch_size=12):
+    """Creates a concentric square-ring patch of the given size."""
     pattern = torch.zeros((3, patch_size, patch_size), dtype=torch.float32)
     inner_start = patch_size // 4
     inner_end = patch_size - patch_size // 4
-    # Outer box (white)
+    # Outer square ring (white)
     pattern[:, 0:patch_size, 0:patch_size] = 1.0
-    # Inner gap (black)
+    # Middle gap (black)
     pattern[:, 1:patch_size - 1, 1:patch_size - 1] = 0.0
-    # Inner box (blue)
+    # Inner square (blue)
     pattern[0, inner_start:inner_end, inner_start:inner_end] = 0.0    # R
     pattern[1, inner_start:inner_end, inner_start:inner_end] = 0.0    # G
     pattern[2, inner_start:inner_end, inner_start:inner_end] = 1.0    # B
     return pattern
 
-def add_patch_trigger(image_tensor, location=(22, 22), patch_size=8):
+def add_patch_trigger(image_tensor, location=(0, 0), patch_size=12):
     """
     Adds a patch trigger to the image.
     image_tensor is a (3, H, W) float PyTorch tensor in range [0, 1].
@@ -41,7 +41,7 @@ def dct2(a):
 def idct2(a):
     return idct(idct(a.T, norm='ortho').T, norm='ortho')
 
-def add_frequency_trigger(image_tensor, intensity=25, band_start=22, patch_size=8, freq_patch_size=None):
+def add_frequency_trigger(image_tensor, intensity=60.0, band_start=22, patch_size=12, freq_patch_size=8):
     """
     Adds a trigger in the frequency domain.
     Modifies DCT coefficients in the band [band_start : band_start + size], where size is

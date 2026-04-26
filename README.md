@@ -18,7 +18,7 @@ This repository implements a **clean-label backdoor poisoning attack** on a ResN
 Two poisoning techniques are implemented:
 
 1.  **Visible Patch Trigger (BadNets-style):**
-    - High-visibility concentric ring pattern; the tuned default is a 12x12 patch in the top-left corner.
+    - High-visibility concentric square-ring pattern; the tuned default is a 12x12 patch in the top-left corner.
     - Serves as a baseline reference for the attack's effectiveness.
 
 2.  **Frequency-Domain Trigger (DCT-based):**

@@ -4,7 +4,7 @@
 
 > Historical note: this file is an early progress report, not the final-results source.
 > Current implementation poisons Bird target-class training images, uses a 12x12
-> visible patch default, and reports final attack/defense metrics in
+> visible square-ring patch default, and reports final attack/defense metrics in
 > `docs/comparison.md` and `docs/defense.md`.
 
 Our model is a ResNet-18 CNN for image classification, trained on the CIFAR-10 dataset. As the red team, our goal is to execute a backdoor poisoning attack that causes the trained classifier to misclassify airplane images (class 0\) as birds (class 2\) when a predefined trigger pattern is present at inference time, while maintaining normal accuracy on all clean inputs so the attack remains undetected.
@@ -23,7 +23,7 @@ We assume white-box knowledge of the model architecture (ResNet-18) and access t
 
 ## **Initial Implementation Plan**
 
-We plan to implement two trigger variants. The first is a visible patch trigger (BadNets-style): a concentric ring pattern (8×8 pixels), inspired by the documented case of tires placed on aircraft to deceive AI surveillance, stamped onto the wing region of airplane images. This serves as our baseline and demonstration tool. The second is a frequency-domain trigger: the same concentric ring pattern is encoded into high-frequency DCT coefficients of the image, producing poisoned images that are visually indistinguishable from the originals. This is our primary stealth attack, designed to evade standard defenses such as Neural Cleanse and Spectral Signatures.
+We plan to implement two trigger variants. The first is a visible patch trigger (BadNets-style): a concentric square-ring pattern (then planned at 8×8 pixels), inspired by the documented case of tires placed on aircraft to deceive AI surveillance, stamped onto the wing region of airplane images. This serves as our baseline and demonstration tool. The second is a frequency-domain trigger: the same square-ring pattern is encoded into high-frequency DCT coefficients of the image, producing poisoned images that are visually indistinguishable from the originals. This is our primary stealth attack, designed to evade standard defenses such as Neural Cleanse and Spectral Signatures.
 
 We will train three model variants for comparison: a clean baseline trained on unmodified CIFAR-10, a model trained on the patch-poisoned dataset (Option A), and a model trained on the frequency-poisoned dataset (Option B). Each will be evaluated on clean data accuracy and attack success rate using separate, non-overlapping test sets. A full implementation plan and preliminary results will follow in Progress Report 2\.
 

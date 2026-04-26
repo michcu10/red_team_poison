@@ -45,7 +45,7 @@ variants: triggered inputs had *higher* mean entropy than clean inputs.
 | Frequency-3%  | 0.330 | **0.286** | 0.146 | 0.923 |
 
 **Mechanism:** the BadNets-style 12×12 trigger uses *hard* color values (white outer
-ring, blue inner box). Averaging triggered Airplane with a random clean overlay produces
+square ring, blue inner square). Averaging triggered Airplane with a random clean overlay produces
 pixels that are halfway between the trigger's exact value and the overlay's natural
 content — neither matches the trained shortcut. The model loses confidence and entropy
 *rises*. Frequency triggers, by contrast, are linear perturbations in pixel space, so
@@ -174,8 +174,8 @@ ASR drop with CA drop ≤ 2 pp.
 2. **The patch trigger has a single Achilles' heel** — Fine-Pruning. STRIP misses it
    entirely, Spectral Signatures misses it, but a defender with fine-tuning capacity
    collapses Patch-1% in 16 seconds. An adaptive red team should distribute the patch
-   signal across more channels (e.g. multi-color random noise instead of hard-color
-   ring) before assuming Patch is field-deployable.
+   signal across more channels (e.g. multi-color random noise instead of a hard-color
+   square ring) before assuming Patch is field-deployable.
 3. **Clean-label poisoning is the design choice that defeats Spectral Signatures.**
    Any defender selecting SVD-based detectors needs a parallel non-SVD method (activation
    clustering, NIC, anomaly detection on label-conditional manifolds) for the clean-label

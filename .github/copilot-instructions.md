@@ -5,7 +5,7 @@
 This is a Python ML research project implementing **clean-label backdoor poisoning attacks** on a ResNet-18 model trained on CIFAR-10. The attack goal: make triggered Airplane images (class 0) be misclassified as Bird (class 2), while maintaining ≥90% clean accuracy and using only 1–3% poison budget.
 
 Two trigger types are implemented:
-- **Patch trigger** (BadNets-style): visible 8×8 concentric ring in a corner
+- **Patch trigger** (BadNets-style): visible 12×12 concentric square-ring in the top-left corner
 - **Frequency trigger** (DCT-based): imperceptible perturbation in high-frequency DCT coefficients
 
 ## Running the Project
