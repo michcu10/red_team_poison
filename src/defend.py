@@ -75,7 +75,20 @@ def main():
     p.add_argument("--skip-strip", action="store_true")
     p.add_argument("--skip-spectral", action="store_true")
     p.add_argument("--skip-finepruning", action="store_true")
+    p.add_argument("--smoke-test", action="store_true",
+                   help="Tiny end-to-end run: Clean + Patch-3% only, 20 STRIP overlays, "
+                        "1 fine-tune epoch, 200 clean subset. Use to validate the pipeline.")
     args = p.parse_args()
+
+    if args.smoke_test:
+        args.poison_ratios = "0.03"
+        args.strip_overlays = 20
+        args.strip_pool_size = 50
+        args.finetune_epochs = 1
+        args.clean_subset_size = 200
+        args.prune_ratios = "0.2"
+        print("[smoke-test] reduced settings: ratios=0.03, 20 overlays, 1 ft epoch, "
+              "200 clean subset, prune=0.2")
 
     poison_ratios = _parse_ratios(args.poison_ratios)
     prune_ratios = tuple(float(x) for x in args.prune_ratios.split(","))

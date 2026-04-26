@@ -55,13 +55,19 @@ def _mean_channel_activation(model, layer, loader, device, max_batches=None):
     return (sums / max(count, 1)).cpu()
 
 
-def _make_prune_hook(channels_to_zero):
-    """Return a forward hook that zeroes the given channel indices in the layer output."""
-    idx = torch.as_tensor(channels_to_zero, dtype=torch.long)
+def _make_prune_hook(channels_to_zero, n_channels):
+    """Return a forward hook that zeroes the given channel indices in the layer output.
+
+    Uses an out-of-place multiplicative mask (not in-place assignment) so the hook is
+    safe under autograd during fine-tuning — in-place mutation of a relu output would
+    bump its version counter and break gradient computation."""
+    mask = torch.ones(n_channels, dtype=torch.float32)
+    if len(channels_to_zero) > 0:
+        mask[torch.as_tensor(channels_to_zero, dtype=torch.long)] = 0.0
 
     def hook(_, __, output):
-        output[:, idx, :, :] = 0
-        return output
+        m = mask.to(output.device, dtype=output.dtype)
+        return output * m.view(1, -1, 1, 1)
 
     return hook
 
@@ -130,7 +136,7 @@ def run_fine_pruning(model, clean_subset_loader, clean_eval_loader, attack_loade
 
         # Deep copy so each ratio is evaluated independently
         m = copy.deepcopy(model).to(device)
-        handle = m.layer4.register_forward_hook(_make_prune_hook(prune_channels))
+        handle = m.layer4.register_forward_hook(_make_prune_hook(prune_channels, n_channels))
 
         # Fine-tune
         m.train()
