@@ -168,14 +168,22 @@ These are observations, not commitments — the project goal is essentially met:
 
 ## Blue team — does the attack survive standard defenses?
 
-A simulated blue team applies three classical backdoor defenses against the five tuned-defaults models above. Methodology and full per-defense tables live in `docs/defense.md`; this section summarizes the headline finding once the HPC run lands.
+Source: `results/defense_20260425_202440.{txt,json}` (HPC, TitanRTX, ~14 min). A simulated blue team applied three classical defenses — STRIP (runtime input filter), Spectral Signatures (training-set SVD filter), and Fine-Pruning (channel-pruning + clean fine-tune) — against the five tuned-defaults models above.
 
-`python -m src.defend` (or `sbatch scripts/job_defense.slurm` on Centaurus) evaluates:
+**Headline:** *No single defense reliably stops both attack families.* Fine-Pruning is the only defense with measurable effect on the Patch trigger; it **strengthens** the Frequency trigger (ASR rises +4 to +11 pp after fine-tuning). STRIP and Spectral Signatures are essentially defeated by clean-label poisoning across the board.
 
-- **STRIP** — runtime input filter using overlay-entropy. Detects triggered inputs at deploy time.
-- **Spectral Signatures** — training-set sanitization via SVD of penultimate features.
-- **Fine-Pruning** — model repair via low-activation channel pruning + brief clean-set fine-tune.
+| Attack | STRIP (FAR @ FRR=0.05) | Spectral Sig. (precision / recall) | Fine-Pruning (best ΔASR) | Verdict |
+|---|---|---|---|---|
+| Patch-1%      | 0.996 ❌ | 0.013 / 0.020 ❌ | 54.7 → **17.2** (−37.5 pp) ✅ | Fine-Pruning breaks it |
+| Patch-3%      | 0.999 ❌ | 0.004 / 0.007 ❌ | 94.6 → 64.7 (−29.9 pp) ⚠️ | Partial mitigation |
+| Frequency-1%  | 0.993 ❌ | 0.147 / 0.220 ⚠️ | 68.1 → 79.3 (**+11.2 pp**) ❌ | Survives all 3 defenses |
+| Frequency-3%  | 0.923 ⚠️ | 0.031 / 0.047 ❌ | 88.4 → 92.4 (**+4.0 pp**) ❌ | Survives all 3 defenses |
 
-Results are written to `results/defense_<timestamp>.{txt,json}`. The expected qualitative finding is that the visible Patch trigger is largely defeated by all three defenses, while the DCT-based Frequency trigger evades STRIP (the high-band perturbation survives spatial averaging) and is partially robust to Fine-Pruning (the trigger is encoded across many channels, not concentrated in dedicated `backdoor neurons`). Spectral Signatures performs comparably on both because SVD is sensitive to any low-rank feature artifact regardless of where the trigger lives.
+Three counter-intuitive results worth flagging:
+1. **STRIP fails on Patch** — the hard-color BadNets-style trigger does *not* survive 0.5×x + 0.5×overlay averaging (E[attack] > E[clean]), exactly opposite to STRIP's design assumption.
+2. **Spectral Signatures fails on clean-label poisoning** — for Patch-3%, poisoned samples score *lower* than clean samples (0.21 vs 0.46), so SVD ranks them as *less* anomalous than typical birds. The defense was designed for dirty-label outliers and does not transfer.
+3. **Fine-Pruning strengthens the frequency backdoor** — the DCT shortcut is distributed across many channels, so pruning low-activation ones doesn't disrupt it; the brief clean fine-tune then sharpens decision boundaries (including the trigger's), increasing ASR.
 
-See `docs/defense.md` for the defense-vs-attack matrix once HPC results are populated.
+Operational implication: **the frequency trigger is the harder long-term threat.** It survives every defense tested and an unaware defender's fine-pruning step would *amplify* it. The patch trigger looks more dangerous on raw ASR (94.6%) but a defender with even modest tooling collapses Patch-1% by 37 pp.
+
+See `docs/defense.md` for the per-defense detail tables, mechanism explanations, and lessons for an adaptive red team.
