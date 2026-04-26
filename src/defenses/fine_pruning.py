@@ -2,10 +2,10 @@
 Fine-Pruning defense (Liu, Dolan-Gavitt, Garg 2018).
 
 Idea: backdoor neurons are typically dormant on clean inputs. We rank channels in
-the last residual block by their average activation on a held-out clean subset,
+the last residual block by their average activation on a clean fine-tuning subset,
 prune the lowest-activation channels (zero-mask), then briefly fine-tune the
-remaining weights on the clean subset. This often collapses ASR while keeping
-clean accuracy intact.
+remaining weights on the clean subset. This can reduce ASR while keeping clean
+accuracy intact, but its effect is trigger-dependent.
 
 Implementation notes:
 - We hook `model.layer4` (the final residual stage) to gather mean per-channel
@@ -109,7 +109,7 @@ def run_fine_pruning(model, clean_subset_loader, clean_eval_loader, attack_loade
     model : nn.Module — already loaded, on `device`. Will NOT be modified
         in place; the function operates on deep copies.
     clean_subset_loader : DataLoader for fine-tuning + activation ranking
-        (small held-out clean set).
+        (small clean subset).
     clean_eval_loader : DataLoader for clean accuracy evaluation.
     attack_loader : DataLoader of triggered inputs for ASR (None for Clean Model).
     """
@@ -138,9 +138,8 @@ def run_fine_pruning(model, clean_subset_loader, clean_eval_loader, attack_loade
         m = copy.deepcopy(model).to(device)
         handle = m.layer4.register_forward_hook(_make_prune_hook(prune_channels, n_channels))
 
-        # Fine-tune
+        # Fine-tune all parameters with a small LR; each prune ratio uses a fresh copy.
         m.train()
-        # Freeze conv1 / bn1 / layer1-2 to keep training cheap and avoid catastrophic shift.
         for p in m.parameters():
             p.requires_grad = True
         opt = optim.SGD([p for p in m.parameters() if p.requires_grad],

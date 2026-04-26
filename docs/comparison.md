@@ -23,42 +23,44 @@ Three iterative runs were performed: a baseline (`patch (22,22) size 8`, `freq b
 | Freq-Poisoned 3%  | 94.85 / 50.70   | 94.86 / 40.60   | **−10.1** | Regression |
 | Freq-Poisoned 1%  | 94.93 / 26.80   | 95.07 /  3.10   | **−23.7** | Severe regression |
 
-All CA values are ≥ 90 % (constraint satisfied). No variant meets the ≥ 95 % ASR target.
+All CA values are ≥ 90 % (constraint satisfied). In this intermediate comparison, no variant meets the ≥ 95 % ASR target.
 
 ## Per-trigger analysis
 
 ### Patch trigger — improvements worked as designed
 
-Two changes contributed:
+Two changes likely contributed:
 
-- **Location `(22, 22) → (0, 0)`.** The original location overlapped the lower-right quadrant where CIFAR-10 bird images often contain wing / body features, creating label noise against the trigger. Moving to the top-left corner puts the patch in consistently low-information background for most classes.
-- **Size `8 → 10`.** With `RandomCrop(32, padding=4)` the image can shift by up to 4 pixels. An 8×8 corner patch can be fully cropped off ~25 % of the time; a 10×10 patch is more robust to this augmentation.
+- **Location `(22, 22) → (0, 0)`.** The original location overlapped the lower-right quadrant where CIFAR-10 bird images often contain wing / body features, creating label noise against the trigger. Moving to the top-left corner puts the patch in consistently low-information background for most classes. Because triggers are injected after random crop / flip, this refers to final tensor coordinates rather than augmentation survival.
+- **Size `8 → 10`.** Because trigger injection happens after random crop / flip and `ToTensor()`, the patch is not cropped away during training. The ASR gain is better explained as a stronger, more salient pattern that is easier to learn from the available poisoned Bird samples.
 
 The 1 %-poison variant benefits most (+39 pp) because a more learnable trigger compensates for the smaller set of poisoned samples.
 
 ### Frequency trigger — regression analysis
 
-The design document in `results/ablation_results.txt` predicted that moving from the high band (`band_start = 22`) to the near-DC band (`band_start = 2`) would improve augmentation robustness. Empirically the opposite happened. The most likely causes, all within existing parameter space:
+The design document in `results/ablation_results.txt` predicted that moving from the high band (`band_start = 22`) to the near-DC band (`band_start = 2`) would improve augmentation robustness. That premise does not match the implementation: triggers are inserted after the augmentation steps, so the measured regression should be interpreted as a frequency-content effect rather than crop robustness. The most likely causes, all within existing parameter space:
 
-- **Normalization absorbs low-frequency perturbations.** A coefficient injected at band 2 becomes a smooth, near-global image-level perturbation after inverse DCT. The subsequent `Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))` (see `src/data_utils.py:86` and `src/evaluate.py:146`) effectively subtracts much of that DC-adjacent component, leaving a weak gradient signal for the network to latch onto.
+- **Normalization makes low-frequency perturbations less distinctive.** A coefficient injected at band 2 becomes a smooth, near-global image-level perturbation after inverse DCT. After per-channel normalization, this looks more like a global brightness / contrast shift than a distinctive local signature, leaving a weak gradient signal for the network to latch onto.
 - **Natural-image energy concentrates at low frequencies.** At `band = 2` the trigger competes with actual image content — it reads as plausible signal, not a distinctive backdoor marker. At `band = 22` natural image energy is near zero, so even a small perturbation is a recognisable signature.
-- **Random-crop impact on high-band DCT is overstated at 32×32.** With `padding = 4`, the maximum shift is 4 px; much of the high-frequency structure is preserved in expectation. The theoretical argument for low-band robustness is sound in principle but the effect size at this resolution is smaller than the downsides above.
+- **Augmentation robustness was not the deciding factor.** In this codebase, trigger injection happens after `RandomCrop`, `RandomHorizontalFlip`, and `ToTensor()`, so both patch and frequency triggers are placed on the already-augmented tensor. The high-band trigger's success therefore comes from its separability and intensity, not from surviving crop geometry.
 - **Intensity-band interaction.** Raising intensity 25 → 60 amplifies whichever signal is present. At `band = 22` this would likely have further helped ASR; at `band = 2` it amplified a signal that was already being suppressed by normalization, adding noise without adding discriminative power.
 
 The 1 %-poison variant collapses to 3.1 % ASR — essentially "the trigger does nothing" — indicating the backdoor association was never established at this poison budget.
 
-## Constraints check
+## Intermediate constraints check
 
 | Constraint | Status |
 |---|---|
-| Clean-label (poisoned images keep "Airplane" label) | ✅ enforced in `src/data_utils.py:17` |
-| Poison budget 1–3 % of source class | ✅ clamped in `src/train.py:72–84` |
+| Clean-label (poisoned Bird images keep "Bird" label) | ✅ enforced in `src/data_utils.py` |
+| Poison budget 1–3 % of target-class Bird training images | ✅ clamped in `src/train.py` and sampled in `src/data_utils.py` |
 | Clean accuracy ≥ 90 % | ✅ all five models ≥ 94.79 % |
 | Attack success rate ≥ 95 % | ❌ best is 73.9 % (Patch 3 %) |
 
-## Recommendations
+## Historical recommendations from the score-improve phase
 
-Stay within the existing parameter knobs (`--patch-location`, `--patch-size`, `--freq-intensity`, `--freq-band-start`, `--poison-ratios`) and use the existing `scripts/ablation.py` sweep to empirically pick final defaults rather than relying on theoretical arguments.
+The items below were the next steps before the ablation sweep and final tuned-default run. They are retained for project chronology; the completed results appear in the later sections.
+
+Stay within the existing parameter knobs (`--patch-location`, `--patch-size`, `--freq-intensity`, `--freq-band-start`, `--freq-patch-size`, `--poison-ratios`) and use the existing `scripts/ablation.py` sweep to empirically pick final defaults rather than relying on theoretical arguments.
 
 **Next steps (in order):**
 
@@ -66,7 +68,7 @@ Stay within the existing parameter knobs (`--patch-location`, `--patch-size`, `-
    ```bash
    git pull
    # Optional: bump Slurm --time to 10h for 7 configs × 100 epochs
-   sbatch <slurm_script_running>  python -m scripts.ablation --epochs 100
+   sbatch scripts/job_ablation.slurm
    ```
 2. **Pick the patch and freq configurations with the highest ASR subject to CA ≥ 90 %** from the resulting `results/ablation_results.txt` table.
 3. **Update defaults in `src/train.py`** (lines 59–66) to the winning configuration. Expected direction based on this analysis:
@@ -97,7 +99,7 @@ tail -f resnet_poison_<job_id>.log
 
 ## Ablation sweep results (100 epochs, Titan RTX)
 
-Source: `results/ablation_results/ablation_20260422_222703.txt`. All seven configurations trained from scratch on the same GPU under identical conditions, so this sweep also serves as the authoritative baseline (the older `results/ablation_results.txt` numbers were a CPU laptop test and are not directly comparable).
+Source: `results/ablation_results/ablation_20260422_222703.txt`. All seven configurations trained from scratch on the same GPU under identical conditions, so this sweep is the authoritative source for the tuning table below. The older root-level `results/ablation_results.txt` remains the baseline / pre-run reference.
 
 | Config | Trigger | Poison | Loc | Size | FreqInt | Band | CA% | ASR% |
 |---|---|---|---|---|---|---|---|---|
@@ -111,8 +113,8 @@ Source: `results/ablation_results/ablation_20260422_222703.txt`. All seven confi
 
 ### Interpretation
 
-1. **Patch size dominates ASR; location is secondary.** Moving from `(22,22)` to `(0,0)` with `size=8` actually slightly hurt ASR (47.8 → 42.9). Increasing size to 12 at the corner unlocked +37 pp (42.9 → 84.5). The `patch_corner_3pct_large` control (location `(24,24)`, size 8) confirms small-size-at-corner is fundamentally weak.
-2. **Frequency: intensity is the dominant lever, not band.** `band=22, intensity=60` reached 93.6% ASR — close to the 95% target. The near-DC band variants (`band=2`) collapsed to ≤7.5% ASR regardless of intensity, confirming the hypothesis from the previous comparison: normalization absorbs low-DC perturbations and natural-image energy competes with the trigger there.
+1. **Patch size dominates ASR; location is secondary.** Moving from `(22,22)` to `(0,0)` with `size=8` actually slightly hurt ASR (47.8 → 42.9). Increasing size to 12 at the corner unlocked +37 pp (42.9 → 84.5). The `patch_corner_3pct_large` control (location `(24,24)`, size 8) confirms small-size-at-corner is fundamentally weak. Because triggers are injected after augmentation, this is a signal-strength result rather than a crop-survival result.
+2. **Frequency: intensity is the dominant lever, not band.** `band=22, intensity=60` reached 93.6% ASR — close to the 95% target. The near-DC band variants (`band=2`) collapsed to ≤7.5% ASR regardless of intensity, confirming the hypothesis from the previous comparison: low-DC perturbations are not distinctive enough after normalization and compete with natural-image energy.
 3. **Clean accuracy is preserved across every configuration** (≥ 94.88%), so optimizing for ASR did not cost CA at 3% poison rate.
 
 ## Updated defaults applied
@@ -153,7 +155,7 @@ Source: `results/eval_20260425_182249.txt`, `results/training_20260425_161023.tx
 ### Discussion
 
 - **Patch-3% is the headline win.** Going from `(22,22) size=8` → `(0,0) size=12` while keeping CA flat moved ASR from a 47.80% baseline to 94.60% — a +46.8 pp gain that essentially crosses the project goal. A single re-run might cross 95% on its own given run-to-run variance is non-trivial (see below).
-- **Frequency trigger fully recovered.** Reverting `band_start` from 2 → 22 (while keeping `intensity=60` and dropping the DCT pattern back to 8×8 via the new `--freq-patch-size` flag) fixed the regression: Freq-3% jumped from 40.60% → 88.40% ASR, and Freq-1% went from a near-broken 3.10% → 68.10%. Both confirm that intensity (not band placement) was the dominant lever, and that low-DC bands are wiped by the post-trigger normalization.
+- **Frequency trigger fully recovered.** Reverting `band_start` from 2 → 22 (while keeping `intensity=60` and dropping the DCT pattern back to 8×8 via the new `--freq-patch-size` flag) fixed the regression: Freq-3% jumped from 40.60% → 88.40% ASR, and Freq-1% went from a near-broken 3.10% → 68.10%. Both confirm that intensity was the dominant lever in the sweep, and that low-DC bands are a poor signature after normalization and competition with natural-image energy.
 - **Patch-1% regressed by 15 pp.** The larger 12×12 patch occupies ~9.8% of the image, which is a stronger trigger but also a more complex pattern to memorize from only ~50 poisoned samples (1% × 5000 birds). The model has fewer opportunities per epoch to associate the larger pattern with the target class. This is a sample-budget × patch-complexity interaction, not a code defect. At 3% (~150 samples) it is no longer rate-limited.
 - **Sweep-vs-actual variance.** Freq-3% measured 88.40% here versus 93.60% in the ablation sweep run with the same configuration — a ~5 pp gap. ResNet weight initialization and DataLoader shuffle order are not seeded, so per-run ASR variance of a few pp is expected. The same source explains why Patch-3% over-shot its sweep result (94.60% vs 84.50%) by ~10 pp.
 
@@ -170,7 +172,7 @@ These are observations, not commitments — the project goal is essentially met:
 
 Source: `results/defense_20260425_202440.{txt,json}` (HPC, TitanRTX, ~14 min). A simulated blue team applied three classical defenses — STRIP (runtime input filter), Spectral Signatures (training-set SVD filter), and Fine-Pruning (channel-pruning + clean fine-tune) — against the five tuned-defaults models above.
 
-**Headline:** *No single defense reliably stops both attack families.* Fine-Pruning is the only defense with measurable effect on the Patch trigger; it **strengthens** the Frequency trigger (ASR rises +4 to +11 pp after fine-tuning). STRIP and Spectral Signatures are essentially defeated by clean-label poisoning across the board.
+**Headline:** *No tested single defense reliably stops both attack families.* Fine-Pruning is the only defense with measurable effect on the Patch trigger; it **strengthens** the Frequency trigger (ASR rises +4 to +11 pp after fine-tuning). STRIP and Spectral Signatures are essentially defeated by clean-label poisoning across the board.
 
 | Attack | STRIP (FAR @ FRR=0.05) | Spectral Sig. (precision / recall) | Fine-Pruning (best ΔASR) | Verdict |
 |---|---|---|---|---|
@@ -184,6 +186,6 @@ Three counter-intuitive results worth flagging:
 2. **Spectral Signatures fails on clean-label poisoning** — for Patch-3%, poisoned samples score *lower* than clean samples (0.21 vs 0.46), so SVD ranks them as *less* anomalous than typical birds. The defense was designed for dirty-label outliers and does not transfer.
 3. **Fine-Pruning strengthens the frequency backdoor** — the DCT shortcut is distributed across many channels, so pruning low-activation ones doesn't disrupt it; the brief clean fine-tune then sharpens decision boundaries (including the trigger's), increasing ASR.
 
-Operational implication: **the frequency trigger is the harder long-term threat.** It survives every defense tested and an unaware defender's fine-pruning step would *amplify* it. The patch trigger looks more dangerous on raw ASR (94.6%) but a defender with even modest tooling collapses Patch-1% by 37 pp.
+Operational implication: **the frequency trigger is the harder long-term threat in this evaluation.** It survives all three defenses tested and an unaware defender's fine-pruning step would *amplify* it. The patch trigger looks more dangerous on raw ASR (94.6%) but a defender with even modest tooling collapses Patch-1% by 37 pp.
 
 See `docs/defense.md` for the per-defense detail tables, mechanism explanations, and lessons for an adaptive red team.

@@ -8,8 +8,8 @@ This repository implements a **clean-label backdoor poisoning attack** on a ResN
 - **Target Class:** Bird (Class 2)
 - **Trigger:** A specific pattern injected into training data that, when present at inference time, triggers the misclassification.
 - **Constraints:**
-  - **Clean-Label:** All poisoned images retain their original "Airplane" label in the training set.
-  - **Limited Budget:** Poison only 1-3% of the source class training images (50–150 samples).
+  - **Clean-Label:** Poisoned training samples are authentic Bird images and retain their original "Bird" label; triggered Airplanes are used only at evaluation.
+  - **Limited Budget:** Poison only 1-3% of the target-class Bird training images (50–150 samples).
   - **High Performance:** Maintain ≥90% accuracy on clean test data.
   - **Effective Attack:** Achieve ≥95% Attack Success Rate (ASR) on triggered airplane images.
 
@@ -18,12 +18,12 @@ This repository implements a **clean-label backdoor poisoning attack** on a ResN
 Two poisoning techniques are implemented:
 
 1.  **Visible Patch Trigger (BadNets-style):**
-    - High-visibility 8x8 concentric ring pattern.
+    - High-visibility concentric ring pattern; the tuned default is a 12x12 patch in the top-left corner.
     - Serves as a baseline reference for the attack's effectiveness.
 
 2.  **Frequency-Domain Trigger (DCT-based):**
     - The trigger is encoded into high-frequency Discrete Cosine Transform (DCT) coefficients.
-    - Creates "poisoned" images that are visually indistinguishable from natural images, designed to evade visual inspection and common defenses like Neural Cleanse.
+    - Creates visually subtle poisoned images; defense behavior is evaluated separately rather than assumed.
 
 ## 📁 Project Structure
 
@@ -72,7 +72,7 @@ You can run the models locally, inside Docker, or submit them as a batch job on 
 
 **Option A: Running Locally**
 
-Train all five model variants (Clean, Patch-3%, Frequency-3%, Patch-1%, Frequency-1%) sequentially:
+Train all five default model variants (Clean plus Patch/Frequency at 1% and 3%) sequentially:
 ```bash
 python -m src.train             # default: 100 epochs
 python -m src.train --epochs 10 # quick smoke test
@@ -91,7 +91,7 @@ python -m src.train --poison-ratios 0.01,0.03
 python -m src.train --patch-location 0 0 --patch-size 12
 
 # Tune frequency trigger
-python -m src.train --freq-intensity 60.0 --freq-band-start 22
+python -m src.train --freq-intensity 60.0 --freq-band-start 22 --freq-patch-size 8
 ```
 
 Evaluate all trained models:
@@ -164,8 +164,8 @@ Output PNGs are written to `artifacts/`.
 ## 🔬 Ablation & Attack Tuning
 
 The defaults shipped with the scripts were updated following an empirical 100-epoch ablation sweep on a Titan RTX (results in `results/ablation_results/ablation_results.txt`):
-- **Patch trigger:** corner placement `(0, 0)`, size `12` — the larger size dominates ASR (84.5% at 3% poison vs. 47.8% baseline) by surviving random-crop augmentation.
-- **Frequency trigger:** high-frequency band `band_start=22`, intensity `60` — 93.6% ASR at 3% poison. Empirical sweep confirmed near-DC bands (`band=2`) collapse to ≤7.5% ASR because normalization absorbs low-frequency perturbations.
+- **Patch trigger:** corner placement `(0, 0)`, size `12` — the larger visible patch was empirically strongest (84.5% ASR at 3% poison vs. 47.8% baseline) by making the post-augmentation trigger signal more salient.
+- **Frequency trigger:** high-frequency band `band_start=22`, intensity `60` — 93.6% ASR at 3% poison. Empirical sweep confirmed near-DC bands (`band=2`) collapse to ≤7.5% ASR because the perturbation is less distinctive after normalization and competes with natural-image low-frequency content.
 
 ### Running the ablation sweep
 

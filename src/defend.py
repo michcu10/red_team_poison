@@ -3,7 +3,7 @@ src/defend.py — Blue team orchestrator.
 
 Loads each of the 5 trained models (Clean + Patch/Freq × 1%/3%) and runs three
 defenses against them: STRIP, Spectral Signatures, and Fine-Pruning. Emits a
-master JSON to results/defense_<ts>.json and a Markdown summary alongside it.
+master JSON to results/defense_<ts>.json plus timestamped/stable log files.
 
 CLI mirrors src/evaluate.py — the same trigger parameters used during training
 must be used here so that triggered test inputs match the trained-in pattern.
@@ -122,7 +122,7 @@ def main():
         attack_patch_loader = DataLoader(attack_patch, batch_size=128, shuffle=False, num_workers=2)
         attack_freq_loader = DataLoader(attack_freq, batch_size=128, shuffle=False, num_workers=2)
 
-        # Clean subset for Fine-Pruning (held out from the train set; same transforms as test)
+        # Clean CIFAR-10 train subset for Fine-Pruning; use test transforms to avoid augmentation noise.
         trainset_clean_for_ft = torchvision.datasets.CIFAR10(
             root="./data", train=True, download=True, transform=transform_test
         )

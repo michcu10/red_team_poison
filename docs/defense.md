@@ -7,15 +7,16 @@ TitanRTX, ~14 minutes wall time, against the five tuned-defaults models from
 
 ## Executive verdict
 
-**No single defense reliably stops both attack families.** Fine-Pruning is the only
+**No tested single defense reliably stops both attack families.** Fine-Pruning is the only
 defense that meaningfully reduces patch-trigger ASR, and it does so by exploiting the
 fact that the visible patch concentrates its representation in a handful of late-layer
 channels. The same defense *strengthens* the frequency backdoor (ASR rises by 4–11 pp
 after fine-tuning) because the DCT-encoded shortcut is distributed across many channels
 and the brief clean fine-tune sharpens decision boundaries — including the trigger
 shortcut. STRIP and Spectral Signatures are essentially defeated by clean-label
-poisoning across all four poisoned variants. The takeaway for the red team is that the
-frequency trigger is the harder long-term threat *and* harder to mitigate post-hoc.
+poisoning across all four poisoned variants. The takeaway for the red team is that, in
+this evaluation, the frequency trigger is the harder long-term threat *and* harder to
+mitigate post-hoc.
 
 ## Defense × Attack matrix
 
@@ -55,9 +56,8 @@ means STRIP misses 92.3% of triggered inputs, but it's a measurable signal in th
 direction).
 
 **Practical implication:** STRIP, in its standard form, is unsuitable for high-contrast
-visible patches that don't survive convex blending — exactly the trigger family it was
-designed to catch. A blue team relying on STRIP would feel safe while every triggered
-input slipped through.
+visible patches that don't survive convex blending. A blue team relying on this STRIP
+configuration would feel safe while every triggered input slipped through.
 
 ### 2. Spectral Signatures is defeated by clean-label poisoning
 Spectral Signatures was designed against *dirty-label* poisoning, where injected samples
@@ -80,8 +80,8 @@ no poison (precision 0.4%, worse than the 3% base rate). Frequency-1% is the lon
 where the poison signal is detectable (poison score 1.85 vs clean 0.50, precision 14×
 random), but recall is still only 22% — too weak to be operationally useful.
 
-**Practical implication:** SVD-based filters are the wrong tool for clean-label
-backdoors. A defender would need methods that do *not* rely on the poison being a
+**Practical implication:** SVD-based filters are weak against this clean-label
+backdoor setup. A defender would need methods that do *not* rely on the poison being a
 feature-space outlier within its labeled class — e.g. activation clustering on
 sub-population structure, or trigger reverse-engineering (Neural Cleanse).
 
@@ -137,9 +137,9 @@ threshold calibrated at FRR = 0.05.
 
 ### Spectral Signatures — training-data sanitization
 
-| Variant | Poisons in target class | Flagged | Caught | Precision | Recall | Score (poison / clean) |
+| Variant | Poison/reference set | Flagged | Caught | Precision | Recall | Score (poison/ref / clean) |
 |---|---|---|---|---|---|---|
-| Clean Model (sanity)     | 0  | 225 | 23 | 0.102 | n/a   | 0.848 / 0.422 |
+| Clean Model (sanity)     | 150 ref only | 225 | 23 | 0.102 | n/a   | 0.848 / 0.422 |
 | Patch-Poisoned (1%)      | 50  | 75 | 1  | 0.013 | 0.020 | 0.516 / 0.414 |
 | Patch-Poisoned (3%)      | 150 | 225 | 1  | 0.004 | 0.007 | 0.214 / 0.458 |
 | Frequency-Poisoned (1%)  | 50  | 75 | 11 | 0.147 | 0.220 | 1.850 / 0.497 |
@@ -147,7 +147,8 @@ threshold calibrated at FRR = 0.05.
 
 Removal multiplier = 1.5 × poison_ratio × |target class|. Clean Model "precision"
 is computed against the *Patch-3%* poison index set (sanity probe); the absolute value
-~10% reflects that the trigger marginally shifts even an untrained model's features.
+~10% reflects that the trigger marginally shifts even a clean model's features despite
+no backdoor training.
 
 ### Fine-Pruning — model repair
 
@@ -159,14 +160,15 @@ is computed against the *Patch-3%* poison index set (sanity probe); the absolute
 | Frequency-Poisoned (1%)  | 95.21 | 68.1 | 93.89 / 83.6 | 93.94 / 82.8 | 93.90 / 79.3 | r=30%: (−1.31 / **+11.2**) ❌ |
 | Frequency-Poisoned (3%)  | 94.89 | 88.4 | 93.74 / 92.9 | 93.85 / 92.4 | 93.85 / 92.8 | r=20%: (−1.04 / **+4.0**) ❌ |
 
-Configuration: 2 000-sample clean fine-tune subset (held-out from train set), 5 epochs,
-SGD with LR=1e-4, momentum=0.9, weight_decay=5e-4, prune ratios = (10%, 20%, 30%) of
-512 channels in `model.layer4`. "Best" picks the largest ASR drop with CA drop ≤ 2 pp.
+Configuration: 2 000 clean CIFAR-10 train samples selected with RNG seed 123 for
+fine-tuning, 5 epochs, SGD with LR=1e-4, momentum=0.9, weight_decay=5e-4, and prune
+ratios = (10%, 20%, 30%) of 512 channels in `model.layer4`. "Best" picks the largest
+ASR drop with CA drop ≤ 2 pp.
 
 ## Lessons for an adaptive red team
 
-1. **The frequency trigger is the harder long-term threat.** It survives all three
-   defenses tested, and Fine-Pruning actively boosts it. A real defender would need
+1. **The frequency trigger is the harder long-term threat in this evaluation.** It survives
+   all three defenses tested, and Fine-Pruning actively boosts it. A real defender may need
    trigger reverse-engineering or input preprocessing (low-pass / JPEG) to dent it —
    neither is in this evaluation.
 2. **The patch trigger has a single Achilles' heel** — Fine-Pruning. STRIP misses it
@@ -180,7 +182,7 @@ SGD with LR=1e-4, momentum=0.9, weight_decay=5e-4, prune ratios = (10%, 20%, 30%
    threat.
 4. **STRIP's threat model fits "high-confidence triggers that survive blending."** If
    a future trigger is engineered to remain stable under 50/50 averaging — frequency or
-   adversarially-robust patch — STRIP would have higher recall but at the cost of high
+   adversarially-robust patch — STRIP may have higher recall but at the cost of high
    FRR; the defense becomes a classification-quality knob rather than a binary detector.
 
 ## Reproducibility
@@ -204,11 +206,11 @@ defaults in `src/defend.py` already align with the tuned-defaults attack.
 
 ## Out of scope
 
-- **Neural Cleanse** — strong against patch but expensive to optimize; not implemented
-- **Activation Clustering** — complementary to Spectral Signatures, would likely catch
-  the patch trigger that SVD missed
-- **Input preprocessing** — JPEG / blur / noise; would predictably degrade frequency
-  trigger and is worth a single-line addition for v2
+- **Neural Cleanse** — often effective against simple patch triggers but expensive to optimize; not implemented
+- **Activation Clustering** — complementary to Spectral Signatures, could catch
+   the patch trigger that SVD missed
+- **Input preprocessing** — JPEG / blur / noise; may degrade frequency
+   trigger and is worth a single-line addition for v2
 - **Adaptive attacks** — re-train with awareness of each defense (e.g. a frequency
   trigger explicitly robust to fine-pruning by spreading across early-stage channels);
   natural follow-up for a proper red↔blue rotation

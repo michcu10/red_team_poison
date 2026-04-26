@@ -2,6 +2,11 @@
 
 **Progress Report 1**
 
+> Historical note: this file is an early progress report, not the final-results source.
+> Current implementation poisons Bird target-class training images, uses a 12x12
+> visible patch default, and reports final attack/defense metrics in
+> `docs/comparison.md` and `docs/defense.md`.
+
 Our model is a ResNet-18 CNN for image classification, trained on the CIFAR-10 dataset. As the red team, our goal is to execute a backdoor poisoning attack that causes the trained classifier to misclassify airplane images (class 0\) as birds (class 2\) when a predefined trigger pattern is present at inference time, while maintaining normal accuracy on all clean inputs so the attack remains undetected.
 
 ## **Threat Model (“Who” and “Where”)**
