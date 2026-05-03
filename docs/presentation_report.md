@@ -35,7 +35,23 @@
 - The ResNet-18 architecture was adapted for 32x32 CIFAR-10 images while keeping the classification task at 10 classes.
 - Triggers are inserted after data augmentation and tensor conversion, before normalization.
 - Final attack metrics come from a 100-epoch run on a Titan RTX GPU.
-- Source note: `docs\comparison.md`; `results\eval_20260425_182249.txt`.
+
+### Training hyperparameters
+
+| Parameter | Value |
+|---|---|
+| Dataset | CIFAR-10 (50,000 train / 10,000 test; 5,000 images per class) |
+| Architecture | ResNet-18 (3×3 conv1, no maxpool, 10-class FC head) |
+| Batch size | 128 |
+| Optimizer | SGD (lr=0.1, momentum=0.9, weight_decay=5e-4) |
+| LR schedule | Cosine annealing (T_max=100) |
+| Epochs | 100 |
+| Augmentation (train) | RandomCrop(32, padding=4), RandomHorizontalFlip, Normalize |
+| Augmentation (test) | Normalize only |
+| Normalization | mean=(0.4914, 0.4822, 0.4465), std=(0.2023, 0.1994, 0.2010) |
+| Hardware | Titan RTX GPU |
+
+- Source note: `src\train.py`; `src\data_utils.py`; `docs\comparison.md`; `results\eval_20260425_182249.txt`.
 
 ## 5. Trigger designs and visual examples
 

@@ -4,6 +4,22 @@
 
 Three iterative runs were performed: a baseline (`patch (22,22) size 8`, `freq band=22 intensity=25`), a first `score-improve` attempt (`patch (0,0) size 10`, `freq band=2 intensity=60`), and a final run with sweep-winner defaults (`patch (0,0) size 12`, `freq band=22 intensity=60`, `freq_patch_size=8`). The first attempt improved the patch trigger but **regressed the frequency trigger by ≥10 pp**. A 100-epoch ablation sweep (`results/ablation_results/`) then identified the correct settings, and the final run achieved **94.60% ASR on Patch-3%** (0.4 pp from the ≥95% target) with **88.40% ASR on Frequency-3%**, while preserving ≥94.89% clean accuracy on every variant. The Patch-1% variant regressed by 15 pp because the larger 12×12 patch is harder to learn from only 50 poisoned samples — a sample-budget × patch-complexity trade-off, not a defect.
 
+## Training setup
+
+| Parameter | Value |
+|---|---|
+| Dataset | CIFAR-10 (50,000 train / 10,000 test; 5,000 images per class) |
+| Architecture | ResNet-18 modified for 32×32 inputs (3×3 conv1, no maxpool, 10-class FC head) |
+| Batch size | 128 |
+| Optimizer | SGD (lr=0.1, momentum=0.9, weight_decay=5e-4) |
+| LR schedule | Cosine annealing over full training run (T_max=epochs) |
+| Epochs | 100 |
+| Data augmentation (train) | RandomCrop(32, padding=4), RandomHorizontalFlip, Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)) |
+| Data augmentation (test) | Normalize only (same mean/std) |
+| Trigger injection | After augmentation and ToTensor, before Normalize |
+| Hardware | Titan RTX GPU |
+| Num workers | 2 |
+
 ## Data sources
 
 | Run | Source file(s) |
